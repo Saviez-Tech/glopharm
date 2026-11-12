@@ -177,8 +177,32 @@ export default function ProductPage() {
                 <span className="font-medium text-blue-600">{tab === "All" ? "All Products" : tab}</span>
             </nav>
 
+            {/* Stat cards */}
+            <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-sm">
+                    <p className="text-sm font-semibold">Total Products</p>
+                    <p className="mt-4 text-3xl font-semibold">{rows.length}</p>
+                    <p className="mt-1 text-[11px] text-white/80">Across all categories</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <p className="text-sm font-semibold text-gray-800">In Stock</p>
+                    <p className="mt-4 text-3xl font-semibold text-blue-600">{rows.filter(r => r.qty > 0).length}</p>
+                    <p className="mt-1 text-[11px] text-gray-500">Products available</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <p className="text-sm font-semibold text-gray-800">Out of Stock</p>
+                    <p className="mt-4 text-3xl font-semibold text-blue-600">{rows.filter(r => r.qty === 0).length}</p>
+                    <p className="mt-1 text-[11px] text-gray-500">Need restocking</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <p className="text-sm font-semibold text-gray-800">Catalog Value</p>
+                    <p className="mt-4 text-3xl font-semibold text-blue-600">₦{rows.reduce((s, r) => s + r.priceNum * r.qty, 0).toLocaleString()}</p>
+                    <p className="mt-1 text-[11px] text-gray-500">Total inventory value</p>
+                </div>
+            </div>
+
             {/* Card */}
-            <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <section className="mt-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                 {/* Toolbar */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="relative w-full max-w-sm">

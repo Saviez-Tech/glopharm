@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -525,6 +526,14 @@ const scopeText = (p: PromoCode) => (p.appliesTo.length ? p.appliesTo.join(", ")
 /* -------------------------------------------------------------------------- */
 
 export default function PromoCodesPage() {
+    return (
+        <Suspense fallback={<div className="p-6 text-sm text-gray-500">Loading…</div>}>
+            <PromoCodesPageInner />
+        </Suspense>
+    );
+}
+
+function PromoCodesPageInner() {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();

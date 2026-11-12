@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -494,6 +495,14 @@ function ReviewDrawer({
 /* -------------------------------------------------------------------------- */
 
 export default function LabTestsPage() {
+    return (
+        <Suspense fallback={<div className="p-6 text-sm text-gray-500">Loading…</div>}>
+            <LabTestsPageInner />
+        </Suspense>
+    );
+}
+
+function LabTestsPageInner() {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();

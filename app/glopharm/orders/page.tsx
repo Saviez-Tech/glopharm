@@ -445,7 +445,31 @@ export default function OrdersPage() {
                 <span className="font-medium text-blue-600">{tabLabel}</span>
             </nav>
 
-            <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+            {/* Stat cards */}
+            <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-sm">
+                    <p className="text-sm font-semibold">Total Orders</p>
+                    <p className="mt-4 text-3xl font-semibold">{orders.length}</p>
+                    <p className="mt-1 text-[11px] text-white/80">All time orders</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <p className="text-sm font-semibold text-gray-800">Shipping</p>
+                    <p className="mt-4 text-3xl font-semibold text-blue-600">{orders.filter(o => o.status === 'Shipping').length}</p>
+                    <p className="mt-1 text-[11px] text-gray-500">In transit</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <p className="text-sm font-semibold text-gray-800">Completed</p>
+                    <p className="mt-4 text-3xl font-semibold text-blue-600">{orders.filter(o => o.status === 'Completed').length}</p>
+                    <p className="mt-1 text-[11px] text-gray-500">Delivered orders</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <p className="text-sm font-semibold text-gray-800">Cancelled</p>
+                    <p className="mt-4 text-3xl font-semibold text-blue-600">{orders.filter(o => o.status === 'Cancelled').length}</p>
+                    <p className="mt-1 text-[11px] text-gray-500">Unpaid / cancelled</p>
+                </div>
+            </div>
+
+            <section className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
                 {/* Toolbar */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="relative hidden w-full max-w-sm md:block">

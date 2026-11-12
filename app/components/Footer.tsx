@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 
 export default function Footer() {
   const [email, setEmail] = useState("");
@@ -234,6 +235,7 @@ export default function Footer() {
               <a href="#terms" className="hover:text-[#00A654] transition-colors">Terms of Use</a>
               <a href="#legal" className="hover:text-[#00A654] transition-colors">Legal</a>
               <a href="#sitemap" className="hover:text-[#00A654] transition-colors">Site Map</a>
+              <Link href="/glopharmadmin" className="hover:text-[#00A654] font-semibold text-gray-700 transition-colors">Admin Portal</Link>
             </div>
           </div>
 

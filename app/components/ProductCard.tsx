@@ -47,11 +47,11 @@ export default function ProductCard({
 
   return (
     <div
-      className={`bg-white rounded-2xl sm:rounded-[28px] p-3 sm:p-5 border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.08)] transition-all duration-300 flex flex-col justify-between group ${className}`}
+      className={`bg-white rounded-xl sm:rounded-2xl p-2.5 sm:p-3.5 border border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.07)] transition-all duration-300 flex flex-col justify-between group ${className}`}
     >
       {/* Top: Product Image Box — click to open detail modal */}
       <div
-        className="relative w-full aspect-[4/3] rounded-xl sm:rounded-[22px] bg-[#f3f4f6] flex items-center justify-center p-2.5 sm:p-4 overflow-hidden cursor-pointer"
+        className="relative w-full aspect-[4/3] rounded-lg sm:rounded-xl bg-[#f3f4f6] flex items-center justify-center p-2 sm:p-3 overflow-hidden cursor-pointer"
         onClick={() => onProductClick?.(product)}
         role="button"
         tabIndex={0}
@@ -63,10 +63,10 @@ export default function ProductCard({
           type="button"
           aria-label="Add to favorites"
           onClick={(e) => { e.stopPropagation(); setIsFavorite(!isFavorite); }}
-          className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/80 backdrop-blur-xs flex items-center justify-center text-gray-500 hover:text-amber-500 transition-colors shadow-xs"
+          className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/80 backdrop-blur-xs flex items-center justify-center text-gray-500 hover:text-amber-500 transition-colors shadow-xs"
         >
           <svg
-            className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform active:scale-125 ${
+            className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-transform active:scale-125 ${
               isFavorite ? "fill-amber-400 text-amber-400" : "fill-none text-gray-600"
             }`}
             stroke="currentColor"
@@ -90,18 +90,18 @@ export default function ProductCard({
       </div>
 
       {/* Middle: Details & Price */}
-      <div className="flex flex-col flex-1 pt-2.5 sm:pt-4 pb-2 sm:pb-3">
-        <h3 className="font-bold text-gray-900 text-xs sm:text-base tracking-tight leading-snug line-clamp-1">
+      <div className="flex flex-col flex-1 pt-2 sm:pt-2.5 pb-1 sm:pb-2">
+        <h3 className="font-bold text-gray-900 text-xs sm:text-sm tracking-tight leading-snug line-clamp-1">
           {product.title}
         </h3>
 
-        <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2 leading-relaxed">
+        <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 line-clamp-1 leading-relaxed">
           {product.description}
         </p>
 
         {/* Price (Centered) */}
-        <div className="text-center mt-2 sm:mt-3 pt-0.5">
-          <span className="font-extrabold text-gray-900 text-sm sm:text-lg tracking-tight">
+        <div className="text-center mt-1.5 sm:mt-2 pt-0.5">
+          <span className="font-extrabold text-gray-900 text-xs sm:text-base tracking-tight">
             {typeof product.price === "number"
               ? `${product.price.toFixed(2)}${product.currency || "$"}`
               : `${product.price}${product.currency || "$"}`}
@@ -110,33 +110,33 @@ export default function ProductCard({
       </div>
 
       {/* Bottom Action Area: Either "Add to cart" button OR [-] quantity [+] controls */}
-      <div className="mt-1.5 sm:mt-2 h-9 sm:h-12 flex items-center justify-center">
+      <div className="mt-1 sm:mt-1.5 h-8 sm:h-9 flex items-center justify-center">
         {quantity === 0 ? (
           // Default State: Full width rounded "Add to cart" button
           <button
             type="button"
             onClick={handleAddToCart}
-            className={`w-full h-full rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm tracking-wide transition-all shadow-sm active:scale-98 ${primaryBtnClass}`}
+            className={`w-full h-full rounded-lg sm:rounded-xl font-bold text-xs tracking-wide transition-all shadow-xs active:scale-98 ${primaryBtnClass}`}
           >
             Add to cart
           </button>
         ) : (
           // In Cart State: [-] count [+] controls matching reference card 2
-          <div className="w-full h-full flex items-center justify-between gap-1.5 sm:gap-3">
+          <div className="w-full h-full flex items-center justify-between gap-1.5 sm:gap-2">
             {/* Minus Button */}
             <button
               type="button"
               onClick={handleDecrement}
               aria-label="Decrease quantity"
-              className={`w-9 sm:w-16 h-full rounded-xl sm:rounded-2xl font-bold text-sm sm:text-lg flex items-center justify-center transition-all shadow-sm active:scale-95 ${primaryBtnClass}`}
+              className={`w-8 sm:w-11 h-full rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center transition-all shadow-xs active:scale-95 ${primaryBtnClass}`}
             >
-              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
+              <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15" />
               </svg>
             </button>
 
             {/* Quantity Number */}
-            <span className="font-extrabold text-gray-900 text-xs sm:text-base select-none px-1 text-center flex-1">
+            <span className="font-extrabold text-gray-900 text-xs sm:text-sm select-none px-1 text-center flex-1">
               {quantity}
             </span>
 
@@ -145,9 +145,9 @@ export default function ProductCard({
               type="button"
               onClick={handleIncrement}
               aria-label="Increase quantity"
-              className={`w-9 sm:w-16 h-full rounded-xl sm:rounded-2xl font-bold text-sm sm:text-lg flex items-center justify-center transition-all shadow-sm active:scale-95 ${primaryBtnClass}`}
+              className={`w-8 sm:w-11 h-full rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center transition-all shadow-xs active:scale-95 ${primaryBtnClass}`}
             >
-              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
+              <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
             </button>

@@ -1,9 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCart } from "@/lib/context/CartContext";
 
 export default function Navbar() {
+  const { totalCount } = useCart();
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isFixed, setIsFixed] = useState(false);
@@ -16,6 +21,22 @@ export default function Navbar() {
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const handleSearch = useCallback(() => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    const params = new URLSearchParams();
+    params.set("q", q);
+    if (selectedCategory !== "All Categories") params.set("category", selectedCategory);
+    router.push(`/products?${params.toString()}`);
+  }, [searchQuery, selectedCategory, router]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") handleSearch();
+    },
+    [handleSearch]
+  );
 
   const categories = [
     "All Categories",
@@ -119,6 +140,9 @@ export default function Navbar() {
                 {/* Input */}
                 <input
                   type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   placeholder="Search for groceries, wellness, medicines..."
                   className="w-full px-4 py-3 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none bg-transparent"
                 />
@@ -126,6 +150,7 @@ export default function Navbar() {
                 {/* Blue search button */}
                 <button
                   type="button"
+                  onClick={handleSearch}
                   aria-label="Search"
                   className="shrink-0 m-1 h-9 px-5 rounded-full bg-[#0265CB] hover:bg-[#0254aa] text-white text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
                 >
@@ -152,7 +177,11 @@ export default function Navbar() {
                 <svg className="w-6 h-6 text-white/90 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
                 </svg>
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#0265CB] text-[9px] font-black text-white flex items-center justify-center ring-2 ring-[#00A654]">3</span>
+                {totalCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-[#0265CB] text-[9px] font-black text-white flex items-center justify-center ring-2 ring-[#00A654]">
+                    {totalCount}
+                  </span>
+                )}
               </Link>
 
               <div className="hidden sm:block w-px h-6 bg-white/25 mx-1" />
@@ -185,10 +214,13 @@ export default function Navbar() {
             <div className="flex items-center w-full bg-white rounded-full shadow-sm overflow-hidden">
               <input
                 type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Search for products..."
                 className="flex-1 px-4 py-2.5 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none bg-transparent"
               />
-              <button type="button" aria-label="Search"
+              <button type="button" onClick={handleSearch} aria-label="Search"
                 className="m-1 w-9 h-9 rounded-full bg-[#0265CB] hover:bg-[#0254aa] text-white flex items-center justify-center transition-all shrink-0">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />

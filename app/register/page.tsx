@@ -1,35 +1,88 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <RegisterPageInner />
+    </Suspense>
+  );
+}
+
+function RegisterPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const refParam =
+    searchParams.get("ref") ||
+    searchParams.get("referral") ||
+    searchParams.get("referral_code") ||
+    searchParams.get("code") ||
+    "";
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [referralCode, setReferralCode] = useState("");
+  const [referralCode, setReferralCode] = useState(refParam.toUpperCase());
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Auto-fill referral code if link changes or on mount
+  useEffect(() => {
+    if (refParam) {
+      setReferralCode(refParam.toUpperCase());
+    }
+  }, [refParam]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!fullName || !email || !password) {
+    const cleanName = fullName.trim();
+    const cleanEmail = email.trim();
+
+    if (!cleanName || !cleanEmail || !password) {
       setError("Please fill in your name, email, and password.");
       return;
     }
 
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      // Navigate to account after simulated registration
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: cleanName,
+          email: cleanEmail,
+          phone: phone.trim(),
+          password,
+          referralCode: referralCode.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Registration failed. Please check your details.");
+      }
+
       router.push("/account");
-    }, 900);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to register. Please try again.";
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -178,16 +231,29 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1">
-                Referral Code (Optional)
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider">
+                  Referral Code (Optional)
+                </label>
+                {referralCode && (
+                  <span className="text-[10px] font-bold text-[#00A654] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                    ₦1,000 Discount Applied
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 placeholder="e.g. GLO-FRIEND-26"
                 value={referralCode}
-                onChange={(e) => setReferralCode(e.target.value)}
-                className="w-full rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-2.5 text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400/50 focus:bg-white focus:border-[#00A654] outline-none transition-all uppercase"
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                className="w-full rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-2.5 text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400/50 focus:bg-white focus:border-[#00A654] focus:ring-2 focus:ring-[#00A654]/15 outline-none transition-all uppercase font-mono"
               />
+              {referralCode && (
+                <p className="text-[11px] text-neutral-500 mt-1 flex items-center gap-1 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00A654]" />
+                  <span>Friend referral code active. Your welcome discount will activate on first order.</span>
+                </p>
+              )}
             </div>
 
             {/* Register CTA Button in Brand Green #00A654 */}

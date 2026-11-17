@@ -1,37 +1,166 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function AccountSettingsPage() {
-  const [activeTab, setActiveTab] = useState<
-    "account" | "billing" | "appearance" | "notifications" | "privacy"
-  >("account");
+  const [activeTab, setActiveTab] = useState<"account">("account");
 
   // Profile Information
   const [profile, setProfile] = useState({
-    name: "Amaka Okafor",
-    email: "amaka.okafor@example.com",
-    phone: "+234 803 123 4567",
-    address: "14 Victoria Island Boulevard, Lagos",
-    city: "Lagos State",
+    username: "",
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "",
   });
 
-  // Security Toggles (from reference image)
-  const [twoFactorAuth, setTwoFactorAuth] = useState(true);
-  const [loginAlerts, setLoginAlerts] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState("");
 
   // Password fields
   const [passwords, setPasswords] = useState({
-    oldPassword: "••••••••",
+    oldPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const handleSave = () => {
-    setToastMessage("Settings saved successfully!");
-    setTimeout(() => setToastMessage(null), 3000);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // ── Fetch Profile on Mount (GET /api/auth/profile) ────────────────────────
+  useEffect(() => {
+    async function fetchProfile() {
+      setLoadingProfile(true);
+      setProfileError("");
+      try {
+        const res = await fetch("/api/auth/profile");
+        if (res.status === 401) {
+          window.location.href = "/login?callbackUrl=" + encodeURIComponent("/account");
+          return;
+        }
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || "Failed to load profile.");
+        }
+
+        if (data.data) {
+          const d = data.data;
+          setProfile({
+            username: d.username ?? "",
+            name: d.name ?? "",
+            email: d.email ?? "",
+            phone: d.phone_number ?? "",
+            address: d.address ?? "",
+            city: d.city ?? "",
+            state: d.state ?? "",
+          });
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Failed to load profile data.";
+        setProfileError(msg);
+      } finally {
+        setLoadingProfile(false);
+      }
+    }
+
+    fetchProfile();
+  }, []);
+
+  // ── Update Profile (PATCH /api/auth/profile/update) ────────────────────────
+  const handleSaveProfile = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setSavingProfile(true);
+    setProfileError("");
+
+    try {
+      const payload = {
+        name: profile.name.trim(),
+        phone_number: profile.phone.trim(),
+        address: profile.address.trim(),
+        city: profile.city.trim(),
+        state: profile.state.trim(),
+      };
+
+      const res = await fetch("/api/auth/profile/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to update profile.");
+      }
+
+      showToast("Profile updated successfully!");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update profile.";
+      setProfileError(msg);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  // ── Change Password (POST /api/auth/change-password) ──────────────────────
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+
+    if (!passwords.oldPassword) {
+      setPasswordError("Please enter your current password.");
+      return;
+    }
+
+    if (!passwords.newPassword || passwords.newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters long.");
+      return;
+    }
+
+    if (passwords.confirmPassword && passwords.newPassword !== passwords.confirmPassword) {
+      setPasswordError("New passwords do not match.");
+      return;
+    }
+
+    setChangingPassword(true);
+
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          old_password: passwords.oldPassword,
+          new_password: passwords.newPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to change password.");
+      }
+
+      setPasswords({
+        oldPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+
+      showToast("Password changed successfully!");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to change password.";
+      setPasswordError(msg);
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   return (
@@ -39,44 +168,49 @@ export default function AccountSettingsPage() {
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 bg-[#00A654] text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 animate-fade-in font-medium text-sm">
-          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+          <svg className="w-5 h-5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
           </svg>
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* ── HEADER (Title + Save Changes CTA Button) ── */}
+      {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
-            Settings
+            Account Settings
           </h1>
           <p className="text-xs sm:text-sm text-neutral-500 mt-1">
-            Manage your personal profile, contact information, and account security.
+            Manage your personal profile, delivery details, and account security.
           </p>
         </div>
 
-        {/* Primary Save Changes Button (Glopharm Brand Green #00A654) */}
+        {/* Primary Save Changes Button */}
         <button
           type="button"
-          onClick={handleSave}
-          className="self-start sm:self-auto px-6 py-2.5 rounded-full bg-[#00A654] hover:bg-[#008f48] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer flex items-center gap-2"
+          onClick={() => handleSaveProfile()}
+          disabled={savingProfile || loadingProfile}
+          className="self-start sm:self-auto px-6 py-2.5 rounded-full bg-[#00A654] hover:bg-[#008f48] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-          </svg>
-          <span>Save Changes</span>
+          {savingProfile ? (
+            <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+            </svg>
+          )}
+          <span>{savingProfile ? "Saving..." : "Save Changes"}</span>
         </button>
       </div>
 
-      {/* ── SUB-NAVIGATION TABS (Matching Reference Header Bar) ── */}
+      {/* ── SUB-NAVIGATION TABS ── */}
       <div className="flex items-center gap-1 sm:gap-2 border-b border-neutral-200 overflow-x-auto scrollbar-none pb-px">
         {[
-          { key: "account", label: "Account Settings", icon: "user" },
-          { key: "billing", label: "Billing & Cards", icon: "card" },
-          { key: "notifications", label: "Notifications", icon: "bell" },
-          { key: "privacy", label: "Privacy & Data", icon: "shield" },
+          { key: "account", label: "Profile & Security", icon: "user" },
         ].map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -96,75 +230,72 @@ export default function AccountSettingsPage() {
         })}
       </div>
 
-      {/* ── TAB 1: ACCOUNT SETTINGS CONTENT ── */}
-      {activeTab === "account" && (
+      {loadingProfile ? (
+        /* Loading skeleton */
+        <div className="space-y-6 animate-pulse">
+          <div className="bg-white rounded-3xl border border-neutral-200 p-8 h-80" />
+          <div className="bg-white rounded-3xl border border-neutral-200 p-8 h-64" />
+        </div>
+      ) : (
         <div className="space-y-10">
-          {/* Section 1: Profile Information */}
-          <div className="bg-white rounded-3xl border border-neutral-200/80 p-6 sm:p-8 shadow-xs">
-            <div className="pb-6 border-b border-neutral-100">
-              <h2 className="text-base sm:text-lg font-bold text-neutral-900">
-                Profile Information
-              </h2>
-              <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
-                Manage your personal details and keep your contact info up to date.
-              </p>
+          {/* Section 1: Profile Information (GET /api/auth/profile & PATCH /api/auth/profile/update) */}
+          <form onSubmit={handleSaveProfile} className="bg-white rounded-3xl border border-neutral-200/80 p-6 sm:p-8 shadow-xs">
+            <div className="pb-6 border-b border-neutral-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-neutral-900">
+                  Profile Information
+                </h2>
+                <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
+                  Update your contact info and primary delivery destination.
+                </p>
+              </div>
+              {profile.username && (
+                <span className="text-xs font-mono font-semibold bg-neutral-100 text-neutral-600 px-3 py-1 rounded-full border border-neutral-200">
+                  @{profile.username}
+                </span>
+              )}
             </div>
 
-            <div className="mt-6 space-y-6">
-              {/* Profile Picture */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-8">
-                <span className="text-xs sm:text-sm font-semibold text-neutral-700 w-full sm:w-36 shrink-0">
-                  Profile Picture
-                </span>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-emerald-500/30 ring-2 ring-emerald-500/10 shrink-0">
-                    <img
-                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"
-                      alt="Amaka Okafor"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3 text-xs font-bold">
-                    <button
-                      type="button"
-                      className="text-neutral-500 hover:text-red-600 transition-colors cursor-pointer"
-                    >
-                      Delete
-                    </button>
-                    <button
-                      type="button"
-                      className="text-[#00A654] hover:text-[#008f48] transition-colors cursor-pointer"
-                    >
-                      Update
-                    </button>
-                  </div>
-                </div>
+            {profileError && (
+              <div className="mt-4 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm flex items-center gap-3">
+                <svg className="w-5 h-5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                </svg>
+                <span>{profileError}</span>
               </div>
+            )}
 
-              {/* Name */}
+            <div className="mt-6 space-y-6">
+              {/* Full Name */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-8">
                 <label className="text-xs sm:text-sm font-semibold text-neutral-700 w-full sm:w-36 shrink-0">
-                  Name
+                  Full Name
                 </label>
                 <input
                   type="text"
+                  placeholder="e.g. John Doe"
                   value={profile.name}
                   onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                   className="w-full max-w-xl rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:bg-white focus:border-[#00A654] focus:ring-2 focus:ring-[#00A654]/15 outline-none transition-all"
                 />
               </div>
 
-              {/* Email */}
+              {/* Email (Read-only from account) */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-8">
                 <label className="text-xs sm:text-sm font-semibold text-neutral-700 w-full sm:w-36 shrink-0">
-                  Email
+                  Email Address
                 </label>
-                <input
-                  type="email"
-                  value={profile.email}
-                  onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                  className="w-full max-w-xl rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:bg-white focus:border-[#00A654] focus:ring-2 focus:ring-[#00A654]/15 outline-none transition-all"
-                />
+                <div className="w-full max-w-xl flex items-center gap-2">
+                  <input
+                    type="email"
+                    disabled
+                    value={profile.email}
+                    className="flex-1 rounded-xl border border-neutral-200 bg-neutral-100/70 px-4 py-2.5 text-xs sm:text-sm text-neutral-500 cursor-not-allowed outline-none"
+                  />
+                  <span className="text-[11px] font-bold text-[#00A654] bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 shrink-0">
+                    Verified
+                  </span>
+                </div>
               </div>
 
               {/* Phone Number */}
@@ -174,6 +305,7 @@ export default function AccountSettingsPage() {
                 </label>
                 <input
                   type="tel"
+                  placeholder="+2348012345678"
                   value={profile.phone}
                   onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                   className="w-full max-w-xl rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:bg-white focus:border-[#00A654] focus:ring-2 focus:ring-[#00A654]/15 outline-none transition-all"
@@ -183,104 +315,88 @@ export default function AccountSettingsPage() {
               {/* Delivery Address */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-8">
                 <label className="text-xs sm:text-sm font-semibold text-neutral-700 w-full sm:w-36 shrink-0">
-                  Delivery Address
+                  Street Address
                 </label>
                 <input
                   type="text"
+                  placeholder="e.g. 12 Aka Road"
                   value={profile.address}
                   onChange={(e) => setProfile({ ...profile, address: e.target.value })}
                   className="w-full max-w-xl rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:bg-white focus:border-[#00A654] focus:ring-2 focus:ring-[#00A654]/15 outline-none transition-all"
                 />
               </div>
-            </div>
-          </div>
 
-          {/* Section 2: Security (Matching the Reference Screenshot) */}
-          <div className="bg-white rounded-3xl border border-neutral-200/80 p-6 sm:p-8 shadow-xs">
-            <div className="pb-6 border-b border-neutral-100">
-              <h2 className="text-base sm:text-lg font-bold text-neutral-900">
-                Security
-              </h2>
-              <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
-                Keep your account secure with extra authentication and alerts.
-              </p>
-            </div>
-
-            <div className="mt-6 space-y-6">
-              {/* Two-Factor Authentication */}
-              <div className="flex items-center justify-between max-w-xl">
-                <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-neutral-900">
-                    Two-Factor Authentication
-                  </h3>
-                  <p className="text-xs text-neutral-500 mt-0.5">
-                    Add an extra layer of protection to your account with SMS OTP.
-                  </p>
-                </div>
-                {/* Switch (Brand Green #00A654) */}
-                <button
-                  type="button"
-                  onClick={() => setTwoFactorAuth(!twoFactorAuth)}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                    twoFactorAuth ? "bg-[#00A654]" : "bg-neutral-300"
-                  }`}
-                  aria-label="Toggle Two-Factor Authentication"
-                >
-                  <div
-                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                      twoFactorAuth ? "translate-x-6" : "translate-x-0"
-                    }`}
+              {/* City & State Row */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-8">
+                <label className="text-xs sm:text-sm font-semibold text-neutral-700 w-full sm:w-36 shrink-0">
+                  City &amp; State
+                </label>
+                <div className="w-full max-w-xl grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    placeholder="City (e.g. Uyo)"
+                    value={profile.city}
+                    onChange={(e) => setProfile({ ...profile, city: e.target.value })}
+                    className="w-full rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:bg-white focus:border-[#00A654] focus:ring-2 focus:ring-[#00A654]/15 outline-none transition-all"
                   />
-                </button>
+                  <input
+                    type="text"
+                    placeholder="State (e.g. Akwa Ibom)"
+                    value={profile.state}
+                    onChange={(e) => setProfile({ ...profile, state: e.target.value })}
+                    className="w-full rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:bg-white focus:border-[#00A654] focus:ring-2 focus:ring-[#00A654]/15 outline-none transition-all"
+                  />
+                </div>
               </div>
 
-              {/* Login Alert Notification */}
-              <div className="flex items-center justify-between max-w-xl">
-                <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-neutral-900">
-                    Login Alert Notification
-                  </h3>
-                  <p className="text-xs text-neutral-500 mt-0.5">
-                    Get notified when your account is accessed from a new device.
-                  </p>
-                </div>
-                {/* Switch (Brand Green #00A654) */}
+              {/* Save Profile Button */}
+              <div className="pt-2 sm:pl-44">
                 <button
-                  type="button"
-                  onClick={() => setLoginAlerts(!loginAlerts)}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                    loginAlerts ? "bg-[#00A654]" : "bg-neutral-300"
-                  }`}
-                  aria-label="Toggle Login Alert Notification"
+                  type="submit"
+                  disabled={savingProfile}
+                  className="px-6 py-2.5 rounded-xl bg-[#00A654] hover:bg-[#008f48] text-white font-bold text-xs sm:text-sm transition-all shadow-xs cursor-pointer flex items-center gap-2 disabled:opacity-60"
                 >
-                  <div
-                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                      loginAlerts ? "translate-x-6" : "translate-x-0"
-                    }`}
-                  />
+                  {savingProfile && (
+                    <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  )}
+                  <span>{savingProfile ? "Saving Profile..." : "Save Profile Details"}</span>
                 </button>
               </div>
             </div>
-          </div>
+          </form>
 
-          {/* Section 3: Password Management (Matching Reference Screenshot) */}
-          <div className="bg-white rounded-3xl border border-neutral-200/80 p-6 sm:p-8 shadow-xs">
+          {/* Section 2: Password Management (POST /api/auth/change-password) */}
+          <form onSubmit={handleChangePassword} className="bg-white rounded-3xl border border-neutral-200/80 p-6 sm:p-8 shadow-xs">
             <div className="pb-6 border-b border-neutral-100">
               <h2 className="text-base sm:text-lg font-bold text-neutral-900">
-                Password Management
+                Password &amp; Security
               </h2>
               <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
-                Update your account password regularly to keep your health data private.
+                Update your account password regularly to keep your orders and prescriptions private.
               </p>
             </div>
+
+            {passwordError && (
+              <div className="mt-4 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm flex items-center gap-3">
+                <svg className="w-5 h-5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                </svg>
+                <span>{passwordError}</span>
+              </div>
+            )}
 
             <div className="mt-6 space-y-5 max-w-xl">
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
-                  Old Password
+                  Current Password
                 </label>
                 <input
                   type="password"
+                  placeholder="Enter your current password"
+                  required
                   value={passwords.oldPassword}
                   onChange={(e) => setPasswords({ ...passwords, oldPassword: e.target.value })}
                   className="w-full rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:bg-white focus:border-[#00A654] outline-none"
@@ -294,79 +410,43 @@ export default function AccountSettingsPage() {
                 <input
                   type="password"
                   placeholder="At least 8 characters"
+                  required
                   value={passwords.newPassword}
                   onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
                   className="w-full rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:bg-white focus:border-[#00A654] outline-none"
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  placeholder="Re-enter new password"
+                  value={passwords.confirmPassword}
+                  onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
+                  className="w-full rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:bg-white focus:border-[#00A654] outline-none"
+                />
+              </div>
+
               <div className="pt-2">
                 <button
-                  type="button"
-                  onClick={handleSave}
-                  className="px-5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs sm:text-sm transition-all shadow-xs cursor-pointer"
+                  type="submit"
+                  disabled={changingPassword}
+                  className="px-6 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs sm:text-sm transition-all shadow-xs cursor-pointer flex items-center gap-2 disabled:opacity-60"
                 >
-                  Update Password
+                  {changingPassword && (
+                    <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  )}
+                  <span>{changingPassword ? "Updating..." : "Update Password"}</span>
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB 2: BILLING & PAYMENT ── */}
-      {activeTab === "billing" && (
-        <div className="bg-white rounded-3xl border border-neutral-200/80 p-6 sm:p-8 space-y-6">
-          <h2 className="text-lg font-bold text-neutral-900">Saved Payment Methods</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-5 rounded-2xl border-2 border-[#00A654] bg-emerald-50/20 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white border border-neutral-200 flex items-center justify-center font-mono font-bold text-xs">
-                  VISA
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-neutral-900">•••• •••• •••• 4242</p>
-                  <p className="text-xs text-neutral-500">Expires 08/28 · Default</p>
-                </div>
-              </div>
-              <span className="text-xs font-bold text-[#00A654] bg-emerald-100 px-2 py-0.5 rounded-full">
-                Active
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB 3: NOTIFICATIONS ── */}
-      {activeTab === "notifications" && (
-        <div className="bg-white rounded-3xl border border-neutral-200/80 p-6 sm:p-8 space-y-6">
-          <h2 className="text-lg font-bold text-neutral-900">Notification Preferences</h2>
-          <div className="space-y-4 max-w-xl">
-            <label className="flex items-center justify-between p-4 rounded-xl border border-neutral-200 cursor-pointer">
-              <div>
-                <p className="text-sm font-bold text-neutral-900">Prescription Status Updates</p>
-                <p className="text-xs text-neutral-500">Receive instant SMS and email when doctor issues prescription.</p>
-              </div>
-              <input type="checkbox" defaultChecked className="w-4 h-4 text-[#00A654] rounded focus:ring-[#00A654]" />
-            </label>
-            <label className="flex items-center justify-between p-4 rounded-xl border border-neutral-200 cursor-pointer">
-              <div>
-                <p className="text-sm font-bold text-neutral-900">Order Delivery Tracking</p>
-                <p className="text-xs text-neutral-500">Live courier notifications for your pharmaceutical orders.</p>
-              </div>
-              <input type="checkbox" defaultChecked className="w-4 h-4 text-[#00A654] rounded focus:ring-[#00A654]" />
-            </label>
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB 4: PRIVACY ── */}
-      {activeTab === "privacy" && (
-        <div className="bg-white rounded-3xl border border-neutral-200/80 p-6 sm:p-8 space-y-6">
-          <h2 className="text-lg font-bold text-neutral-900">Medical Data & Privacy</h2>
-          <p className="text-sm text-neutral-600">
-            GloPharm complies with Nigerian Health Data Regulations and NDPR standards. Your uploaded test results are strictly confidential and only accessible to licensed medical practitioners assigned to your review.
-          </p>
+          </form>
         </div>
       )}
     </div>

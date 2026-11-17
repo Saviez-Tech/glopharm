@@ -1,32 +1,55 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl =
+    searchParams.get("callbackUrl") || searchParams.get("redirect") || "/account";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!email || !password) {
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password) {
       setError("Please fill in both email and password.");
       return;
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Invalid email or password.");
+      }
+
+      router.push(callbackUrl);
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to sign in. Please try again.";
+      setError(msg);
+    } finally {
       setIsLoading(false);
-      // Navigate to account after simulated login
-      router.push("/account");
-    }, 800);
+    }
   };
 
   return (
@@ -41,99 +64,95 @@ export default function LoginPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
             </div>
-            <span className="text-xl font-black tracking-tight text-neutral-900">
-              Glo<span className="text-[#00A654]">Pharm</span>
-            </span>
+            <div className="flex flex-col">
+              <span className="text-xl font-black tracking-tight text-neutral-900 leading-none">
+                Glo<span className="text-[#00A654]">Pharm</span>
+              </span>
+              <span className="text-[10px] text-neutral-400 font-semibold tracking-wider uppercase mt-0.5">
+                Health &amp; Groceries
+              </span>
+            </div>
           </Link>
         </div>
 
-        {/* Center: Main Form */}
-        <div className="my-10 lg:my-0">
+        {/* Middle: Main Form */}
+        <div className="my-8 sm:my-12">
+          {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
-              Welcome
+              Welcome back
             </h1>
-            <p className="text-xs sm:text-sm text-neutral-500 mt-2 font-medium">
-              Get started for a seamless shopping experience
+            <p className="text-sm text-neutral-500 mt-2">
+              Sign in to manage your health orders, prescriptions, and pharmacy deliveries.
             </p>
           </div>
 
-          {/* Social Login Buttons (Google & Facebook) */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <button
-              type="button"
-              className="flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 text-xs sm:text-sm font-bold text-neutral-800 transition-all shadow-2xs cursor-pointer"
-            >
-              {/* Google G SVG */}
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17Z" />
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24Z" />
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.42l4.03-3.15Z" />
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z" />
+          {/* Error Alert */}
+          {error && (
+            <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200/80 text-red-700 text-xs sm:text-sm flex items-start gap-3 animate-shake">
+              <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
               </svg>
-              <span>Google</span>
-            </button>
-
-            <button
-              type="button"
-              className="flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 text-xs sm:text-sm font-bold text-neutral-800 transition-all shadow-2xs cursor-pointer"
-            >
-              {/* Facebook Logo SVG */}
-              <svg className="w-4 h-4 text-[#1877F2] fill-current" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-              </svg>
-              <span>Facebook</span>
-            </button>
-          </div>
-
-          {/* Divider */}
-          <div className="relative flex items-center justify-center my-6">
-            <div className="w-full border-t border-neutral-200" />
-            <span className="bg-white px-3 text-[11px] font-bold text-neutral-400 uppercase tracking-widest absolute">
-              OR
-            </span>
-          </div>
+              <span>{error}</span>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-3 rounded-xl bg-red-50 text-red-600 text-xs font-semibold border border-red-200">
-                {error}
-              </div>
-            )}
-
+            {/* Email Field */}
             <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
-                Email
-              </label>
-              <input
-                type="email"
-                placeholder="johndoe@gmail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-3 text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400/50 focus:bg-white focus:border-[#00A654] focus:ring-2 focus:ring-[#00A654]/15 outline-none transition-all"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
-                Password
+              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">
+                Email Address
               </label>
               <div className="relative flex items-center">
+                <div className="absolute left-4 text-neutral-400 pointer-events-none">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                  </svg>
+                </div>
+                <input
+                  type="email"
+                  required
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-2xl border border-neutral-200 bg-[#FBFBFA] pl-11 pr-4 py-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:border-[#00A654] focus:ring-2 focus:ring-[#00A654]/15 outline-none transition-all shadow-xs"
+                />
+              </div>
+            </div>
+
+            {/* Password Field */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider">
+                  Password
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-bold text-[#00A654] hover:text-[#008f48] transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative flex items-center">
+                <div className="absolute left-4 text-neutral-400 pointer-events-none">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                  </svg>
+                </div>
                 <input
                   type={showPassword ? "text" : "password"}
-                  placeholder="At least 8 characters"
+                  required
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl border border-neutral-200 bg-[#FBFBFA] px-4 py-3 pr-11 text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400/50 focus:bg-white focus:border-[#00A654] focus:ring-2 focus:ring-[#00A654]/15 outline-none transition-all"
-                  required
+                  className="w-full rounded-2xl border border-neutral-200 bg-[#FBFBFA] pl-11 pr-12 py-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:border-[#00A654] focus:ring-2 focus:ring-[#00A654]/15 outline-none transition-all shadow-xs"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 text-neutral-400 hover:text-neutral-700 cursor-pointer"
-                  aria-label="Toggle password visibility"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-4 text-neutral-400 hover:text-neutral-600 transition-colors cursor-pointer"
                 >
                   {showPassword ? (
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -147,117 +166,130 @@ export default function LoginPage() {
                   )}
                 </button>
               </div>
-
-              <div className="flex justify-end mt-2">
-                <Link
-                  href="/account"
-                  className="text-xs font-semibold text-neutral-500 hover:text-[#00A654] transition-colors"
-                >
-                  Forgot password?
-                </Link>
-              </div>
             </div>
 
-            {/* Primary Login Button (GloPharm Brand Green #00A654 as requested) */}
+            {/* Remember Me */}
+            <div className="flex items-center pt-1">
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  defaultChecked
+                  className="w-4 h-4 rounded text-[#00A654] border-neutral-300 focus:ring-[#00A654] focus:ring-offset-0 cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-neutral-600 select-none">
+                  Keep me signed in on this device
+                </span>
+              </label>
+            </div>
+
+            {/* Sign In CTA Button */}
             <div className="pt-2">
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 rounded-xl bg-[#00A654] hover:bg-[#008f48] active:scale-[0.99] text-white font-bold text-sm shadow-[0_4px_16px_rgba(0,166,84,0.3)] hover:shadow-[0_6px_22px_rgba(0,166,84,0.4)] transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-4 px-6 rounded-2xl bg-[#00A654] hover:bg-[#008f48] text-white font-bold text-sm sm:text-base shadow-lg shadow-[#00A654]/25 hover:shadow-xl hover:shadow-[#00A654]/30 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <>
-                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                     </svg>
                     <span>Signing in...</span>
                   </>
                 ) : (
-                  <span>Login</span>
+                  <>
+                    <span>Sign In</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                    </svg>
+                  </>
                 )}
               </button>
             </div>
           </form>
 
-          {/* Switch to Register */}
-          <p className="text-xs sm:text-sm text-neutral-600 text-center mt-8">
-            Don&apos;t have an account?{" "}
+          {/* Sign Up Redirect */}
+          <div className="mt-6 text-center text-xs sm:text-sm text-neutral-500">
+            Don&apos;t have a GloPharm account yet?{" "}
             <Link
               href="/register"
-              className="font-bold text-[#00A654] hover:text-[#008f48] transition-colors underline decoration-2 underline-offset-4"
+              className="font-bold text-[#00A654] hover:text-[#008f48] underline underline-offset-4 decoration-2 transition-colors"
             >
-              Register
+              Create Account
             </Link>
-          </p>
+          </div>
         </div>
 
-        {/* Bottom copyright */}
-        <p className="text-[11px] text-neutral-400 text-center lg:text-left">
-          &copy; 2026 GloPharm Technologies Ltd. All rights reserved.
-        </p>
+        {/* Footer info */}
+        <div className="pt-6 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-400 gap-2">
+          <span>&copy; {new Date().getFullYear()} GloPharm Ltd. All rights reserved.</span>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="hover:text-neutral-700 transition-colors">Privacy</Link>
+            <Link href="/" className="hover:text-neutral-700 transition-colors">Terms</Link>
+            <Link href="/" className="hover:text-neutral-700 transition-colors">Help</Link>
+          </div>
+        </div>
       </div>
 
-      {/* ── RIGHT COLUMN: BRAND PREVIEW & TESTIMONIAL CARD (Matches Reference Layout) ── */}
-      <div className="hidden lg:flex w-1/2 bg-[#F6F8F6] p-12 xl:p-16 flex-col justify-center items-center relative overflow-hidden border-l border-neutral-200/80">
-        {/* Subtle decorative circles */}
-        <div className="absolute top-12 right-12 w-96 h-96 rounded-full bg-[#00A654]/5 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-12 left-12 w-96 h-96 rounded-full bg-[#0265CB]/5 blur-3xl pointer-events-none" />
+      {/* ── RIGHT COLUMN: HERO CAROUSEL / BRAND BANNER ── */}
+      <div className="hidden lg:flex w-1/2 bg-[#FAF5EC] border-l border-[#ECE5D8] flex-col justify-between p-12 xl:p-16 relative overflow-hidden select-none">
+        {/* Decorative background circle */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[580px] h-[580px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 max-w-md w-full space-y-8">
-          {/* Main Card (Browser / Review Frame from Reference Image) */}
-          <div className="bg-white rounded-3xl p-6 shadow-xl border border-neutral-100 relative">
-            {/* Browser top dots */}
-            <div className="flex items-center gap-1.5 pb-4 border-b border-neutral-100 mb-4">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
-              <span className="w-2.5 h-2.5 rounded-full bg-[#00A654]" />
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-              <span className="text-[10px] font-mono text-neutral-400 ml-2">glopharm.ng/store</span>
-            </div>
-
-            {/* Product Image Preview */}
-            <div className="w-full h-52 rounded-2xl bg-[#F8F9FA] overflow-hidden flex items-center justify-center p-3">
-              <img
-                src="https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80"
-                alt="Health & Farm Produce"
-                className="w-full h-full object-contain mix-blend-multiply"
-              />
-            </div>
-
-            {/* Star Rating */}
-            <div className="flex items-center gap-1 mt-4">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <svg key={star} className="w-4 h-4 text-amber-400 fill-current" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 0 .95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 0-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 0 0-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 0-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 0 0 .951-.69l1.07-3.292Z" />
-                </svg>
-              ))}
-            </div>
-
-            {/* Testimonial Quote from image */}
-            <p className="text-xs text-neutral-700 font-medium mt-2 leading-relaxed">
-              &quot;Got fresh farm groceries and genuine prescription medications delivered in 2 hours. The service is so reliable, I LOVE IT.&quot;
-            </p>
-
-            <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between text-[11px]">
-              <span className="font-bold text-neutral-900">Verified Patient</span>
-              <span className="text-[#00A654] font-bold">100% Authentic</span>
-            </div>
+        {/* Top Badges */}
+        <div className="flex items-center justify-between z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/90 backdrop-blur-xs border border-[#ECE5D8] shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-[#00A654] animate-pulse" />
+            <span className="text-xs font-bold text-neutral-800 tracking-tight">
+              NAFDAC Certified Pharmacy
+            </span>
           </div>
 
-          {/* Floating Brand Badge (Matches 'Believe in yourself' badge in reference) */}
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-neutral-200/80 -mt-6 ml-6 max-w-[280px]">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#00A654] text-white flex items-center justify-center font-black text-xs shrink-0">
-                GP
+          <div className="text-xs font-semibold text-neutral-500">
+            24/7 Verified Support
+          </div>
+        </div>
+
+        {/* Center: Hero Product / Visual Mock */}
+        <div className="relative my-auto flex items-center justify-center py-8 z-10">
+          <div className="relative max-w-md w-full">
+            <div className="relative mx-auto w-72 h-80 bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.06)] border border-[#ECE5D8] p-6 flex flex-col items-center justify-center group hover:scale-[1.02] transition-transform duration-300">
+              <div className="w-48 h-48 rounded-2xl bg-[#F6F5F0] flex items-center justify-center p-4 overflow-hidden mb-4">
+                <img
+                  src="https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=500&auto=format&fit=crop&q=80"
+                  alt="Vitamin C Effervescent"
+                  className="w-full h-full object-contain mix-blend-multiply"
+                />
               </div>
-              <div>
-                <p className="text-xs font-bold text-neutral-900">GloPharm Certified</p>
-                <p className="text-[10px] text-neutral-500">Fast cold-chain delivery</p>
+
+              <div className="text-center w-full">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#00A654]">
+                  Best Seller
+                </span>
+                <h3 className="font-bold text-neutral-900 text-sm mt-0.5 truncate">
+                  Immunity Boost &amp; Wellness
+                </h3>
+                <p className="text-xs font-semibold text-neutral-400 mt-0.5">
+                  Same-day delivery across Nigeria
+                </p>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Bottom Heading & Subtitle */}
+        {/* Bottom Testimonial Card */}
+        <div className="z-10 bg-white/90 backdrop-blur-md rounded-3xl p-6 border border-[#ECE5D8] shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-[#00A654] text-white flex items-center justify-center font-black text-xs shrink-0">
+              GP
+            </div>
+            <div>
+              <p className="text-xs font-bold text-neutral-900">GloPharm Certified</p>
+              <p className="text-[10px] text-neutral-500">Fast cold-chain delivery</p>
+            </div>
+          </div>
+
           <div className="text-center pt-2">
             <h2 className="text-xl font-extrabold text-neutral-900 tracking-tight">
               Start Shopping &amp; Living Healthy
@@ -269,5 +301,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

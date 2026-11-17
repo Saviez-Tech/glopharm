@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "./components/Navbar";
 import ProductCard, { Product } from "./components/ProductCard";
 import Footer from "./components/Footer";
@@ -65,7 +65,7 @@ const marqueeProducts: Product[] = [
   },
 ];
 
-// Next Two Rows: 8 Static Products (2 Rows x 4 Columns)
+// Next Two Rows: 8 Products (2 Rows x 4 Columns)
 const gridProducts: Product[] = [
   {
     id: "g1",
@@ -143,6 +143,60 @@ const gridProducts: Product[] = [
 
 export default function Home() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  // State for homepage product list
+  const [homeProducts, setHomeProducts] = useState<Product[]>([]);
+  const [homeTotalCount, setHomeTotalCount] = useState<number>(0);
+  const [homeLoading, setHomeLoading] = useState(true);
+  const [homeError, setHomeError] = useState("");
+
+  // Fetch products on mount
+  useEffect(() => {
+    async function fetchHomeProducts() {
+      try {
+        const res = await fetch('/api/ecommerce/products');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to load products');
+        const backendList = data.data?.results ?? [];
+        setHomeTotalCount(data.data?.count ?? backendList.length);
+        const mapped = backendList.map((bp: any) => ({
+          id: bp.id,
+          title: bp.name,
+          description: `${bp.category} · ${bp.subcategory}`,
+          price: Number(bp.price).toLocaleString('en-NG'),
+          currency: '₦',
+          image: bp.image,
+          initialQuantity: 0,
+          category: bp.category,
+          subcategory: bp.subcategory,
+          stock: bp.stock,
+          original_price: bp.original_price,
+        }));
+        setHomeProducts(mapped);
+      } catch (err: any) {
+        setHomeError(err.message || 'Error loading products');
+      } finally {
+        setHomeLoading(false);
+      }
+    }
+    fetchHomeProducts();
+  }, []);
+
+  // First 10 goods for the scrolling marquee
+  const marqueeItems =
+    homeProducts.length >= 10
+      ? homeProducts.slice(0, 10)
+      : homeProducts.length > 0
+      ? homeProducts
+      : marqueeProducts;
+
+  // Grid products: either remaining goods if >10 or all homeProducts / fallback
+  const gridDisplayItems =
+    homeProducts.length > 10
+      ? homeProducts.slice(10)
+      : homeProducts.length > 0
+      ? homeProducts
+      : gridProducts;
+
 
   return (
     <main className="min-h-screen bg-[#fcfcf9] text-gray-900 relative flex flex-col">
@@ -267,10 +321,10 @@ export default function Home() {
       {/* 2. DEMARCATION BAND BETWEEN HERO AND PRODUCTS */}
       <div className="relative w-full z-20 my-6">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
-          
+
           {/* Demarcation Card with Trust Badges */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-[0_10px_35px_rgba(0,0,0,0.04)] border border-gray-100/90 grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 items-center">
-            
+
             {/* Perk 1: Express Delivery (Brand Green #00A654) */}
             <div className="flex items-center gap-3.5 group">
               <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-[#00A654] flex items-center justify-center shrink-0 group-hover:bg-[#00A654] group-hover:text-white transition-colors">
@@ -356,7 +410,8 @@ export default function Home() {
 
       {/* PRODUCT CATALOG AREA WITH DEDICATED CONTRASTING BACKGROUND & REDUCED MARGINS */}
       <div className="w-full bg-[#edf4ee] border-t border-emerald-900/10 pt-10 pb-16 relative">
-        <style dangerouslySetInnerHTML={{ __html: `
+        <style dangerouslySetInnerHTML={{
+          __html: `
           @keyframes marqueeScroll {
             0% {
               transform: translate3d(0, 0, 0);
@@ -378,7 +433,7 @@ export default function Home() {
 
         {/* Unified container for both Row 1 and Rows 2-3: Aligns boundaries and reduces side margins */}
         <div className="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
-          
+
           {/* 3. ROW 1: ANIMATED CONTINUOUS SLIDER (STARTING & STOPPING AT PRODUCT GRID BOUNDS) */}
           <section className="relative w-full py-2 z-10">
             <div className="mb-4 flex items-center justify-between">
@@ -403,9 +458,9 @@ export default function Home() {
               {/* Right edge shadow fade */}
               <div className="absolute right-0 inset-y-0 w-8 sm:w-16 bg-gradient-to-l from-[#edf4ee] to-transparent z-20 pointer-events-none" />
 
-              {/* Seamless Infinite Loop moving from Right to Left */}
+              {/* Seamless Infinite Loop moving from Right to Left: First 10 goods */}
               <div className="animate-marquee-track flex gap-4 sm:gap-6 items-stretch">
-                {[...marqueeProducts, ...marqueeProducts].map((product, idx) => (
+                {[...marqueeItems, ...marqueeItems].map((product, idx) => (
                   <ProductCard
                     key={`marquee-${product.id}-${idx}`}
                     product={product}
@@ -429,12 +484,12 @@ export default function Home() {
                   Quality Groceries &amp; Health Essentials
                 </h2>
               </div>
-              
+
               <a
-                href="#all"
+                href="/products"
                 className="text-sm font-bold text-[#00A654] hover:underline underline-offset-4 flex items-center gap-1.5"
               >
-                <span>Browse Full Catalog</span>
+                <span>Browse Full Catalog{homeTotalCount > 0 ? ` (${homeTotalCount} Goods)` : ""}</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                 </svg>
@@ -443,7 +498,18 @@ export default function Home() {
 
             {/* Normal Grid (2 Rows of 4 on desktop = 8 Cards, 2 per row on mobile) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-              {gridProducts.map((product) => (
+              {homeLoading && (
+                <div className="col-span-full py-10 text-center text-gray-500">
+                  <div className="inline-block w-7 h-7 border-3 border-[#00A654] border-t-transparent rounded-full animate-spin mb-2" />
+                  <p className="text-xs font-semibold">Loading fresh products...</p>
+                </div>
+              )}
+              {homeError && (
+                <p className="col-span-full text-center text-xs text-amber-600 bg-amber-50 py-2 rounded-lg">
+                  {homeError} (Showing curated catalog below)
+                </p>
+              )}
+              {(!homeLoading ? gridDisplayItems : gridProducts).map((product) => (
                 <ProductCard
                   key={product.id}
                   product={product}

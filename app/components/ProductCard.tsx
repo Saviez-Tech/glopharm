@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useCart } from "@/lib/context/CartContext";
 
 export interface Product {
   id: string | number;
@@ -10,6 +11,14 @@ export interface Product {
   image: string;
   currency?: string;
   initialQuantity?: number;
+  category?: string;
+  subcategory?: string;
+  stock?: number;
+  original_price?: string | number;
+  specifications?: { id?: number; name: string; value: string }[];
+  image2?: string;
+  image3?: string;
+  image4?: string;
 }
 
 interface ProductCardProps {
@@ -25,7 +34,8 @@ export default function ProductCard({
   className = "",
   onProductClick,
 }: ProductCardProps) {
-  const [quantity, setQuantity] = useState(product.initialQuantity || 0);
+  const { getItemQuantity, addItem, updateQuantity } = useCart();
+  const quantity = getItemQuantity(product.id);
   const [isFavorite, setIsFavorite] = useState(false);
 
   const primaryBtnClass =
@@ -34,15 +44,15 @@ export default function ProductCard({
       : "bg-[#00A654] hover:bg-[#008f48] text-white";
 
   const handleAddToCart = () => {
-    setQuantity(1);
+    addItem(product, 1);
   };
 
   const handleIncrement = () => {
-    setQuantity((prev) => prev + 1);
+    updateQuantity(String(product.id), 1);
   };
 
   const handleDecrement = () => {
-    setQuantity((prev) => (prev > 1 ? prev - 1 : 0));
+    updateQuantity(String(product.id), -1);
   };
 
   return (
@@ -102,9 +112,10 @@ export default function ProductCard({
         {/* Price (Centered) */}
         <div className="text-center mt-1.5 sm:mt-2 pt-0.5">
           <span className="font-extrabold text-gray-900 text-xs sm:text-base tracking-tight">
+            {product.currency || "₦"}
             {typeof product.price === "number"
-              ? `${product.price.toFixed(2)}${product.currency || "$"}`
-              : `${product.price}${product.currency || "$"}`}
+              ? product.price.toLocaleString("en-NG", { minimumFractionDigits: 0 })
+              : String(product.price).replace(/^[₦$]\s*/, "")}
           </span>
         </div>
       </div>

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCart } from "@/lib/context/CartContext";
 
 interface AccountLayoutProps {
   children: React.ReactNode;
@@ -17,8 +18,38 @@ interface NavItem {
 
 export default function AccountLayout({ children }: AccountLayoutProps) {
   const pathname = usePathname();
+  const { totalCount } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [userName, setUserName] = useState("User Account");
+
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.status === 401) {
+          window.location.href = "/login?callbackUrl=" + encodeURIComponent(pathname);
+          return;
+        }
+        const json = await res.json();
+        if (json.data?.user) {
+          const u = json.data.user;
+          setUserName(u.name || u.full_name || u.username || u.email || "User Account");
+        }
+      } catch {
+        // middleware handles server requests
+      }
+    }
+    checkAuth();
+  }, [pathname]);
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/login";
+    }
+  };
 
   // Navigation: My Orders, Prescriptions, Referrals, and Account Settings
   const mainNavItems: NavItem[] = [
@@ -34,7 +65,6 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
     {
       label: "Lab Tests & Prescriptions",
       href: "/account/prescriptions",
-      badge: "1 Ready",
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -44,7 +74,6 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
     {
       label: "Referrals & Rewards",
       href: "/account/referrals",
-      badge: "+500 pts",
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H4.5a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1 1 14.625 7.5H12m0 0V21m-8.625-9.75h17.25" />
@@ -181,7 +210,11 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
                 </svg>
                 Cart
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#00A654] text-white text-[9px] font-black flex items-center justify-center">3</span>
+                {totalCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-[#00A654] text-white text-[9px] font-black flex items-center justify-center">
+                    {totalCount}
+                  </span>
+                )}
               </Link>
             </div>
 
@@ -243,22 +276,12 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
               </svg>
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#00A654] text-white text-[9px] font-black flex items-center justify-center">3</span>
+              {totalCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#00A654] text-white text-[9px] font-black flex items-center justify-center">
+                  {totalCount}
+                </span>
+              )}
             </Link>
-          </div>
-
-          {/* Desktop Search Input */}
-          <div className="flex-1 max-w-md hidden sm:block">
-            <div className="relative flex items-center">
-              <svg className="w-4 h-4 text-neutral-400 absolute left-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search orders, prescriptions, medicines..."
-                className="w-full bg-[#F8F9FA] rounded-full pl-10 pr-4 py-2 text-xs sm:text-sm text-neutral-800 placeholder:text-neutral-400/70 border border-neutral-200 focus:outline-none focus:border-[#00A654] focus:bg-white transition-all"
-              />
-            </div>
           </div>
 
           {/* Right Action Icons & User Profile */}
@@ -301,21 +324,28 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
 
             {/* User Profile Chip */}
             <div className="flex items-center gap-2.5 pl-2 sm:pl-3 sm:border-l border-neutral-200">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden ring-2 ring-[#00A654]/20 shrink-0">
-                <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
-                  alt="Amaka Okafor"
-                  className="w-full h-full object-cover"
-                />
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-emerald-100 text-[#00A654] font-bold text-xs flex items-center justify-center ring-2 ring-[#00A654]/20 shrink-0">
+                {userName.charAt(0).toUpperCase()}
               </div>
               <div className="hidden sm:flex flex-col text-left">
-                <span className="text-xs font-bold text-neutral-900 leading-tight">
-                  Amaka Okafor
+                <span className="text-xs font-bold text-neutral-900 leading-tight truncate max-w-[120px]">
+                  {userName}
                 </span>
                 <span className="text-[10px] text-neutral-500 leading-none">
                   Patient Account
                 </span>
               </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                title="Log out"
+                className="ml-1 p-1.5 text-neutral-400 hover:text-red-600 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+                aria-label="Log out"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+                </svg>
+              </button>
             </div>
           </div>
         </header>
@@ -345,13 +375,12 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
 
           <Link
             href="/account/prescriptions"
-            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl text-[11px] font-bold transition-colors ${
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl text-[11px] font-bold transition-colors ${
               pathname.startsWith("/account/prescriptions")
                 ? "text-[#00A654]"
                 : "text-neutral-500 hover:text-neutral-900"
             }`}
           >
-            <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-[#00A654]" />
             <svg className="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
             </svg>
@@ -466,6 +495,19 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
                         <span className="text-xs font-bold">My Cart</span>
                       </Link>
                     </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-neutral-100">
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+                      </svg>
+                      <span>Sign Out</span>
+                    </button>
                   </div>
                 </nav>
               </div>

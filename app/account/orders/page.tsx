@@ -1,117 +1,157 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-interface Order {
-  id: string;
-  date: string;
-  status: "Delivered" | "Out for Delivery" | "Processing";
-  itemsCount: number;
-  total: number;
-  items: {
-    title: string;
-    image: string;
-    quantity: number;
-    price: number;
-  }[];
-  trackingSteps: { title: string; time: string; completed: boolean }[];
+/* ── Types matching the backend response ── */
+interface OrderItem {
+  product_id: number;
+  product_name: string;
+  product_image: string;
+  unit_price: string;
+  quantity: number;
+  line_total: string;
 }
 
-const ORDERS_DATA: Order[] = [
-  {
-    id: "GLO-98421",
-    date: "November 2, 2026",
-    status: "Out for Delivery",
-    itemsCount: 3,
-    total: 18500,
-    items: [
-      {
-        title: "Vitamin C 1000mg Effervescent",
-        image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80",
-        quantity: 1,
-        price: 4500,
-      },
-      {
-        title: "Farm Fresh Organic Eggs (Crate)",
-        image: "https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=300&auto=format&fit=crop&q=80",
-        quantity: 1,
-        price: 4200,
-      },
-      {
-        title: "Cod Liver Oil Omega-3",
-        image: "https://images.unsplash.com/photo-1577401239170-897942555fb3?w=300&auto=format&fit=crop&q=80",
-        quantity: 2,
-        price: 4900,
-      },
-    ],
-    trackingSteps: [
-      { title: "Order Confirmed & Paid", time: "10:15 AM", completed: true },
-      { title: "Prescription & Produce Packed", time: "11:30 AM", completed: true },
-      { title: "Dispatched with Courier", time: "01:45 PM", completed: true },
-      { title: "Arrived at Destination", time: "Estimated 03:00 PM", completed: false },
-    ],
-  },
-  {
-    id: "GLO-98104",
-    date: "October 26, 2026",
-    status: "Delivered",
-    itemsCount: 2,
-    total: 10000,
-    items: [
-      {
-        title: "Multivitamin Daily Formula (30 caps)",
-        image: "https://images.unsplash.com/photo-1577401239170-897942555fb3?w=300&auto=format&fit=crop&q=80",
-        quantity: 1,
-        price: 8500,
-      },
-      {
-        title: "Pain Relief Paracetamol Extra",
-        image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&auto=format&fit=crop&q=80",
-        quantity: 1,
-        price: 1500,
-      },
-    ],
-    trackingSteps: [
-      { title: "Order Placed", time: "09:00 AM", completed: true },
-      { title: "Verified by Pharmacist", time: "09:40 AM", completed: true },
-      { title: "Out for Delivery", time: "11:00 AM", completed: true },
-      { title: "Delivered to Customer", time: "01:10 PM", completed: true },
-    ],
-  },
-  {
-    id: "GLO-97652",
-    date: "October 14, 2026",
-    status: "Delivered",
-    itemsCount: 1,
-    total: 45000,
-    items: [
-      {
-        title: "Blood Pressure Monitor (Digital)",
-        image: "https://images.unsplash.com/photo-1615461066841-6116e61058f4?w=300&auto=format&fit=crop&q=80",
-        quantity: 1,
-        price: 45000,
-      },
-    ],
-    trackingSteps: [
-      { title: "Order Placed", time: "08:15 AM", completed: true },
-      { title: "Packaged & QC Checked", time: "09:20 AM", completed: true },
-      { title: "Courier En Route", time: "10:30 AM", completed: true },
-      { title: "Delivered & Signed", time: "12:15 PM", completed: true },
-    ],
-  },
-];
+interface Order {
+  order_number: string;
+  status: string;
+  status_label: string;
+  payment_status: string;
+  total: string;
+  created_at: string;
+  total_quantity: number;
+  items: OrderItem[];
+}
+
+type FilterTab = "All" | "pending" | "delivered";
 
 export default function OrdersPage() {
-  const [filter, setFilter] = useState<"All" | "Out for Delivery" | "Delivered">("All");
-  const [trackingModalOrder, setTrackingModalOrder] = useState<Order | null>(null);
+  const router = useRouter();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState<FilterTab>("All");
+
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/ecommerce/orders");
+      const data = await res.json();
+
+      if (res.status === 401) {
+        router.push("/login?callbackUrl=" + encodeURIComponent("/account/orders"));
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to load orders.");
+      }
+
+      setOrders(data.data?.results ?? []);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load orders.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const filteredOrders =
     filter === "All"
-      ? ORDERS_DATA
-      : ORDERS_DATA.filter((o) => o.status === filter);
+      ? orders
+      : orders.filter((o) => o.status === filter);
 
-  const formatNaira = (val: number) => "₦" + val.toLocaleString("en-NG");
+  const formatNaira = (val: string | number) =>
+    "₦" + Number(val).toLocaleString("en-NG");
+
+  const formatDate = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleDateString("en-NG", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch {
+      return iso;
+    }
+  };
+
+  const getStatusBadge = (status: string, label: string) => {
+    switch (status) {
+      case "delivered":
+        return (
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00A654] bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+            </svg>
+            {label || "Delivered"}
+          </span>
+        );
+      case "pending":
+        return (
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            {label || "Pending"}
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0265CB] bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+            <span className="w-2 h-2 rounded-full bg-[#0265CB] animate-ping" />
+            {label || status}
+          </span>
+        );
+    }
+  };
+
+  /* ── LOADING STATE ── */
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">My Orders</h1>
+          <p className="text-xs sm:text-sm text-neutral-500 mt-1">Loading your orders…</p>
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-3xl border border-neutral-200/90 p-5 sm:p-7 animate-pulse">
+              <div className="h-5 bg-neutral-200 rounded w-1/3 mb-4" />
+              <div className="h-4 bg-neutral-100 rounded w-2/3 mb-2" />
+              <div className="h-4 bg-neutral-100 rounded w-1/2" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── ERROR STATE ── */
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">My Orders</h1>
+        </div>
+        <div className="p-6 rounded-2xl bg-red-50 border border-red-200 text-center">
+          <p className="text-red-600 font-semibold text-sm">{error}</p>
+          <button
+            type="button"
+            onClick={fetchOrders}
+            className="mt-4 px-5 py-2 rounded-full bg-[#00A654] hover:bg-[#008f48] text-white font-bold text-xs transition-all"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -139,7 +179,7 @@ export default function OrdersPage() {
 
       {/* ── FILTER TABS ── */}
       <div className="flex items-center gap-2 border-b border-neutral-200 pb-px">
-        {(["All", "Out for Delivery", "Delivered"] as const).map((tab) => (
+        {(["All", "pending", "delivered"] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -150,41 +190,57 @@ export default function OrdersPage() {
                 : "border-transparent text-neutral-500 hover:text-neutral-900"
             }`}
           >
-            {tab}
+            {tab === "All" ? "All" : tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
+
+      {/* ── EMPTY STATE ── */}
+      {filteredOrders.length === 0 && (
+        <div className="text-center py-16">
+          <div className="w-16 h-16 rounded-full bg-neutral-100 text-neutral-400 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007Z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">No orders yet</h3>
+          <p className="text-gray-500 text-sm mb-6">Start shopping to see your orders here.</p>
+          <Link
+            href="/products"
+            className="px-6 py-2.5 bg-[#00A654] text-white rounded-full font-bold text-sm hover:bg-[#008f48] transition-colors"
+          >
+            Browse Products
+          </Link>
+        </div>
+      )}
 
       {/* ── ORDERS LIST ── */}
       <div className="space-y-5">
         {filteredOrders.map((order) => (
           <div
-            key={order.id}
+            key={order.order_number}
             className="bg-white rounded-3xl border border-neutral-200/90 p-5 sm:p-7 shadow-xs hover:shadow-md transition-shadow"
           >
             {/* Top Bar of Card */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-neutral-100 gap-3">
               <div className="flex items-center gap-3">
                 <span className="font-mono font-bold text-sm sm:text-base text-neutral-900">
-                  #{order.id}
+                  #{order.order_number}
                 </span>
                 <span className="text-neutral-300">·</span>
-                <span className="text-xs sm:text-sm text-neutral-500">{order.date}</span>
+                <span className="text-xs sm:text-sm text-neutral-500">{formatDate(order.created_at)}</span>
               </div>
 
-              {/* Status Badge */}
+              {/* Status Badge + Total */}
               <div className="flex items-center gap-3">
-                {order.status === "Out for Delivery" ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0265CB] bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
-                    <span className="w-2 h-2 rounded-full bg-[#0265CB] animate-ping" />
-                    Out for Delivery
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00A654] bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                    </svg>
-                    Delivered
+                {getStatusBadge(order.status, order.status_label)}
+                {order.payment_status && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    order.payment_status === "paid"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-orange-100 text-orange-700"
+                  }`}>
+                    {order.payment_status.toUpperCase()}
                   </span>
                 )}
                 <span className="font-extrabold text-neutral-900 text-sm sm:text-base">
@@ -203,17 +259,17 @@ export default function OrdersPage() {
                   >
                     <div className="w-12 h-12 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 border border-neutral-100">
                       <img
-                        src={item.image}
-                        alt={item.title}
+                        src={item.product_image}
+                        alt={item.product_name}
                         className="w-full h-full object-contain mix-blend-multiply"
                       />
                     </div>
                     <div>
                       <p className="text-xs font-bold text-neutral-800 line-clamp-1 max-w-[160px]">
-                        {item.title}
+                        {item.product_name}
                       </p>
                       <p className="text-[11px] text-neutral-400">
-                        Qty: {item.quantity} · {formatNaira(item.price)}
+                        Qty: {item.quantity} · {formatNaira(item.unit_price)}
                       </p>
                     </div>
                   </div>
@@ -222,15 +278,8 @@ export default function OrdersPage() {
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setTrackingModalOrder(order)}
-                  className="px-4 py-2 rounded-xl border border-neutral-300 hover:border-neutral-400 text-xs font-bold text-neutral-700 hover:text-neutral-900 transition-colors cursor-pointer"
-                >
-                  Track Order
-                </button>
                 <Link
-                  href="/cart"
+                  href="/products"
                   className="px-4 py-2 rounded-xl bg-[#00A654] hover:bg-[#008f48] text-white text-xs font-bold transition-all shadow-xs"
                 >
                   Buy Again
@@ -240,77 +289,6 @@ export default function OrdersPage() {
           </div>
         ))}
       </div>
-
-      {/* ── TRACKING MODAL ── */}
-      {trackingModalOrder && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative animate-scale-up">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
-              <div>
-                <h3 className="text-lg font-bold text-neutral-900">
-                  Track Order #{trackingModalOrder.id}
-                </h3>
-                <p className="text-xs text-neutral-500 mt-0.5">
-                  Placed on {trackingModalOrder.date}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTrackingModalOrder(null)}
-                className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-500 transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Stepper Timeline */}
-            <div className="mt-6 space-y-5">
-              {trackingModalOrder.trackingSteps.map((step, idx) => (
-                <div key={idx} className="flex items-start gap-4">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                        step.completed
-                          ? "bg-[#00A654] text-white"
-                          : "border-2 border-neutral-300 text-neutral-400"
-                      }`}
-                    >
-                      {step.completed ? "✓" : idx + 1}
-                    </div>
-                    {idx < trackingModalOrder.trackingSteps.length - 1 && (
-                      <div
-                        className={`w-0.5 h-8 my-1 ${
-                          step.completed ? "bg-[#00A654]" : "bg-neutral-200"
-                        }`}
-                      />
-                    )}
-                  </div>
-                  <div>
-                    <p
-                      className={`text-sm font-bold ${
-                        step.completed ? "text-neutral-900" : "text-neutral-400"
-                      }`}
-                    >
-                      {step.title}
-                    </p>
-                    <p className="text-xs text-neutral-500">{step.time}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-8 pt-4 border-t border-neutral-100 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setTrackingModalOrder(null)}
-                className="px-5 py-2 rounded-full bg-neutral-900 text-white text-xs font-bold hover:bg-neutral-800 transition-all cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

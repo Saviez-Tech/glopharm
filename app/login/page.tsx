@@ -1,19 +1,43 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl =
-    searchParams.get("callbackUrl") || searchParams.get("redirect") || "/account";
+  const rawCallback =
+    searchParams.get("callback") ||
+    searchParams.get("callbackUrl") ||
+    searchParams.get("next") ||
+    searchParams.get("redirect") ||
+    "/account";
+  const callbackUrl = rawCallback.startsWith("/") ? rawCallback : `/${rawCallback}`;
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // If already authenticated, redirect to callback destination
+  useEffect(() => {
+    async function checkExistingAuth() {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data?.authenticated) {
+            window.location.assign(callbackUrl);
+          }
+        }
+      } catch {
+        // stay on login page
+      }
+    }
+    checkExistingAuth();
+  }, [callbackUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,12 +66,11 @@ function LoginForm() {
         throw new Error(data.message || "Invalid email or password.");
       }
 
-      router.push(callbackUrl);
-      router.refresh();
+      // Perform a full navigation so new cookies are sent with request headers
+      window.location.assign(callbackUrl);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to sign in. Please try again.";
       setError(msg);
-    } finally {
       setIsLoading(false);
     }
   };

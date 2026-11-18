@@ -126,7 +126,7 @@ export default function PrescriptionsPage() {
       const url = `/api/lab-tests${pageToLoad > 1 ? `?page=${pageToLoad}` : ""}`;
       const res = await fetch(url);
       if (res.status === 401) {
-        window.location.href = "/login?callbackUrl=" + encodeURIComponent("/account/prescriptions");
+        window.location.href = "/login?callback=" + encodeURIComponent("/account/prescriptions");
         return;
       }
       const json = await res.json();

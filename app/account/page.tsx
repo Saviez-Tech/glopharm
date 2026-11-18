@@ -44,7 +44,7 @@ export default function AccountSettingsPage() {
       try {
         const res = await fetch("/api/auth/profile");
         if (res.status === 401) {
-          window.location.href = "/login?callbackUrl=" + encodeURIComponent("/account");
+          window.location.href = "/login?callback=" + encodeURIComponent("/account");
           return;
         }
 

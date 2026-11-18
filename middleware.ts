@@ -82,9 +82,18 @@ function setCookieOnResponse(
   });
 }
 
-function redirectToLogin(request: NextRequest, pathname: string): NextResponse {
+function getTargetUrl(request: NextRequest): string {
+  const { pathname, search } = request.nextUrl;
+  const cleanParams = new URLSearchParams(search);
+  cleanParams.delete("_rsc");
+  const queryString = cleanParams.toString();
+  return pathname + (queryString ? `?${queryString}` : "");
+}
+
+function redirectToLogin(request: NextRequest, targetUrl: string): NextResponse {
   const loginUrl = new URL("/login", request.url);
-  loginUrl.searchParams.set("callbackUrl", pathname);
+  loginUrl.searchParams.set("callback", targetUrl);
+  loginUrl.searchParams.set("callbackUrl", targetUrl);
   const redirect = NextResponse.redirect(loginUrl);
   redirect.cookies.delete("accessToken");
   redirect.cookies.delete("refreshToken");
@@ -101,17 +110,35 @@ export async function middleware(request: NextRequest) {
   const accessToken = request.cookies.get("accessToken")?.value;
   const refreshToken = request.cookies.get("refreshToken")?.value;
 
+  // ── Case 0: Visiting /login while already authenticated ───────────────────
+  if (pathname === "/login") {
+    const rawCallback =
+      request.nextUrl.searchParams.get("callback") ||
+      request.nextUrl.searchParams.get("callbackUrl") ||
+      request.nextUrl.searchParams.get("next") ||
+      request.nextUrl.searchParams.get("redirect") ||
+      "/account";
+    const callbackTarget = rawCallback.startsWith("/") ? rawCallback : `/${rawCallback}`;
+
+    if (accessToken && !isExpired(accessToken)) {
+      return NextResponse.redirect(new URL(callbackTarget, request.url));
+    }
+    return NextResponse.next();
+  }
+
   // ── Case 1: Token is valid and not near expiry ────────────────────────────
   if (accessToken && !isExpired(accessToken)) {
     return NextResponse.next();
   }
+
+  const targetUrl = getTargetUrl(request);
 
   // ── Case 2: Access token missing or expired — try to refresh with refreshToken ──
   if (refreshToken) {
     // If refreshToken itself is expired, do not attempt refresh; send to login immediately
     if (isExpired(refreshToken, 0)) {
       if (isProtected) {
-        return redirectToLogin(request, pathname);
+        return redirectToLogin(request, targetUrl);
       }
       const response = NextResponse.next();
       response.cookies.delete("accessToken");
@@ -135,7 +162,7 @@ export async function middleware(request: NextRequest) {
 
     // Refresh failed (refresh token expired on backend / invalid / revoked)
     if (isProtected) {
-      return redirectToLogin(request, pathname);
+      return redirectToLogin(request, targetUrl);
     }
 
     // For non-protected routes just clear and continue as guest
@@ -148,17 +175,18 @@ export async function middleware(request: NextRequest) {
 
   // ── Case 3: No tokens at all ─────────────────────────────────────────────
   if (isProtected) {
-    return redirectToLogin(request, pathname);
+    return redirectToLogin(request, targetUrl);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  // Run on /account pages AND all API routes that need auth
+  // Run on /account pages, /login, AND all API routes that need auth
   matcher: [
     "/account",
     "/account/:path*",
+    "/login",
     "/api/ecommerce/checkout",
     "/api/ecommerce/orders",
   ],

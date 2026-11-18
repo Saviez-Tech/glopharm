@@ -42,7 +42,7 @@ export default function OrdersPage() {
       const data = await res.json();
 
       if (res.status === 401) {
-        router.push("/login?callbackUrl=" + encodeURIComponent("/account/orders"));
+        window.location.href = "/login?callback=" + encodeURIComponent("/account/orders");
         return;
       }
 

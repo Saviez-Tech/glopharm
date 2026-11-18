@@ -28,7 +28,7 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
       try {
         const res = await fetch("/api/auth/me");
         if (res.status === 401) {
-          window.location.href = "/login?callbackUrl=" + encodeURIComponent(pathname);
+          window.location.href = "/login?callback=" + encodeURIComponent(pathname);
           return;
         }
         const json = await res.json();

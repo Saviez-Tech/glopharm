@@ -91,7 +91,7 @@ export default function ReferralsPage() {
         ]);
 
         if (sumRes.status === 401 || friendsRes.status === 401 || cashbackRes.status === 401) {
-          window.location.href = "/login?callbackUrl=" + encodeURIComponent("/account/referrals");
+          window.location.href = "/login?callback=" + encodeURIComponent("/account/referrals");
           return;
         }
 

@@ -3,11 +3,13 @@ import { cookies } from "next/headers";
 import { apiClient } from "@/lib/api/client";
 import { isApiError } from "@/lib/api/types";
 import { withAuth } from "@/lib/auth/withAuth";
+import { withAdminAuth } from "@/lib/auth/withAdminAuth";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { old_password, new_password } = body;
+    const old_password = body.old_password || body.currentPassword;
+    const new_password = body.new_password || body.newPassword;
 
     if (!old_password || !new_password) {
       return NextResponse.json(
@@ -17,7 +19,10 @@ export async function POST(req: NextRequest) {
     }
 
     const cookieStore = await cookies();
-    const { data: backendRes, cookieResponse } = await withAuth(
+    const isAdmin = cookieStore.has("adminAccessToken") && !cookieStore.has("accessToken");
+    const authRunner = isAdmin ? withAdminAuth : withAuth;
+
+    const { data: backendRes, cookieResponse } = await authRunner(
       cookieStore,
       (token) =>
         apiClient("api/auth/change-password/", {

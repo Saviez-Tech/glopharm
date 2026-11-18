@@ -170,33 +170,35 @@ export default function Footer() {
             {/* Column 2: Company */}
             <div className="lg:col-span-2 flex flex-col gap-3">
               <h4 className="font-bold text-gray-900 text-sm tracking-tight mb-1">Company</h4>
-              <a href="#about" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">About Us</a>
-              <a href="#services" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Services</a>
-              <a href="#community" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Community</a>
-              <a href="#testimonials" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Testimonial</a>
+              <Link href="/about" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">About Us</Link>
+              <Link href="/pharmacy" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Pharmacy Hub</Link>
+              <Link href="/contact" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Contact Us</Link>
+              <Link href="/products" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">All Products</Link>
             </div>
 
             {/* Column 3: Support */}
             <div className="lg:col-span-2 flex flex-col gap-3">
               <h4 className="font-bold text-gray-900 text-sm tracking-tight mb-1">Support</h4>
-              <a href="#help" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Help Center</a>
-              <a href="#twitter" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Tweet @ Us</a>
-              <a href="#consultation" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Pharmacist Chat</a>
-              <a href="#feedback" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Feedback</a>
+              <Link href="/contact" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Help &amp; Inquiries</Link>
+              <a href="https://wa.me/2348012345678" target="_blank" rel="noreferrer" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">WhatsApp Chat</a>
+              <Link href="/account/prescriptions" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Upload Prescription</Link>
+              <Link href="/account" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">My Account</Link>
             </div>
 
             {/* Column 4: Links */}
             <div className="lg:col-span-2 flex flex-col gap-3">
               <h4 className="font-bold text-gray-900 text-sm tracking-tight mb-1">Links</h4>
-              <a href="#groceries" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Fresh Groceries</a>
-              <a href="#pharmacy" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Pharmacy &amp; Meds</a>
-              <a href="#deals" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Daily Deals</a>
-              <a href="#all" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">All in One</a>
+              <Link href="/products?category=Fresh%20Fruits" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Fresh Groceries</Link>
+              <Link href="/pharmacy" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Pharmacy &amp; Meds</Link>
+              <Link href="/account/orders" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Order Tracking</Link>
+              <Link href="/products" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">All in One Store</Link>
             </div>
 
             {/* Column 5: Contact Us */}
             <div className="lg:col-span-2 flex flex-col gap-3.5">
-              <h4 className="font-bold text-gray-900 text-sm tracking-tight mb-1">Contact Us</h4>
+              <h4 className="font-bold text-gray-900 text-sm tracking-tight mb-1">
+                <Link href="/contact" className="hover:text-[#00A654] transition-colors">Contact Us</Link>
+              </h4>
 
               <div className="flex items-center gap-2.5 text-xs sm:text-sm text-gray-600">
                 <svg className="w-4 h-4 text-[#00A654] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">

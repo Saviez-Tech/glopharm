@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, createContext, useContext, ReactNode } from "react";
+import React, { useState, useEffect, createContext, useContext, ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import AdminSidebar from "./components/AdminSidebar";
 import AdminHeader from "./components/AdminHeader";
@@ -35,6 +35,31 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   // Exclude admin layout (sidebar + header) on login/auth pages
   const isAuthPage = pathname ? pathname.includes("/glopharm/login") : false;
+
+  // Active admin session check: immediately redirects if token is invalid or expired
+  useEffect(() => {
+    if (isAuthPage) return;
+    let cancelled = false;
+
+    async function verifyAdminSession() {
+      try {
+        const res = await fetch("/api/gload/auth/me", { cache: "no-store" });
+        if (cancelled) return;
+        if (res.status === 401) {
+          window.location.href = `/glopharm/login?session_expired=1&callback=${encodeURIComponent(
+            pathname || "/glopharm"
+          )}`;
+        }
+      } catch {
+        // network failure, let route handler or next fetch handle
+      }
+    }
+
+    verifyAdminSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, isAuthPage]);
 
   if (isAuthPage) {
     return <>{children}</>;

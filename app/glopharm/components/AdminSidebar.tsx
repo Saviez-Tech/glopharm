@@ -79,6 +79,14 @@ export default function AdminSidebar({
   const onDashboard = pathname === BASE || pathname === `${BASE}/`;
   const closeMobile = () => setMobileMenuOpen?.(false);
 
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/gload/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/glopharm/login";
+    }
+  };
+
   const rowCls = (isActive: boolean) =>
     `w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all ${sidebarCollapsed ? "justify-center" : ""
     } ${isActive
@@ -267,6 +275,22 @@ export default function AdminSidebar({
                   <SideIcon name="dashboard" />
                   <span>Customer Storefront</span>
                 </Link>
+
+                <div className="my-1 border-t border-gray-100" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileDropdownOpen(false);
+                    handleLogout();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 cursor-pointer"
+                >
+                  <svg className="h-4 w-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                  </svg>
+                  <span>Log Out</span>
+                </button>
               </div>
             )}
           </div>

@@ -9,6 +9,9 @@ export async function POST() {
   response.cookies.delete("accessToken");
   response.cookies.delete("refreshToken");
   response.cookies.delete("user");
+  response.cookies.delete("adminAccessToken");
+  response.cookies.delete("adminRefreshToken");
+  response.cookies.delete("adminUser");
 
   return response;
 }

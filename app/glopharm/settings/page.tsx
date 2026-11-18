@@ -5,9 +5,7 @@ import Link from "next/link";
 
 const SETTINGS_HREF = "/glopharm/settings";
 
-// TODO: point this at your real endpoint.
-// Expected: POST { currentPassword, newPassword } -> 2xx on success, { message } on error.
-const CHANGE_PASSWORD_ENDPOINT = "/api/admin/change-password";
+const CHANGE_PASSWORD_ENDPOINT = "/api/gload/auth/change-password";
 
 type FieldKey = "current" | "next" | "confirm";
 
@@ -66,10 +64,14 @@ export default function ChangePasswordPage() {
             const res = await fetch(CHANGE_PASSWORD_ENDPOINT, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ currentPassword: values.current, newPassword: values.next }),
+                body: JSON.stringify({ old_password: values.current, new_password: values.next }),
             });
+            if (res.status === 401) {
+                window.location.href = "/glopharm/login?session_expired=1";
+                return;
+            }
+            const data = await res.json().catch(() => null);
             if (!res.ok) {
-                const data = await res.json().catch(() => null);
                 throw new Error(data?.message || "Could not change password. Please try again.");
             }
             setSuccess(true);

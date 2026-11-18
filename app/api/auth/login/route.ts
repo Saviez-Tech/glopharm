@@ -16,6 +16,7 @@ interface LoginResponseData {
     email?: string;
     full_name?: string;
     name?: string;
+    is_staff?: boolean;
   };
 }
 
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
         message: backendRes.message || "Login successful.",
         data: {
           user: responseData.user || { email: parsed.data.email },
+          is_staff: responseData.user?.is_staff ?? false,
         },
       },
       { status: 200 }
@@ -72,6 +74,16 @@ export async function POST(req: NextRequest) {
         path: "/",
         maxAge: 60 * 60 * 24 * 7, // 7 days
       });
+      // Also set admin token so staff users can access admin BFF routes
+      if (responseData.user?.is_staff) {
+        response.cookies.set("adminAccessToken", accessToken, {
+          httpOnly: true,
+          secure: isProduction,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 60 * 15,
+        });
+      }
     }
 
     if (refreshToken) {
@@ -82,6 +94,15 @@ export async function POST(req: NextRequest) {
         path: "/",
         maxAge: 60 * 60 * 24 * 30, // 30 days
       });
+      if (responseData.user?.is_staff) {
+        response.cookies.set("adminRefreshToken", refreshToken, {
+          httpOnly: true,
+          secure: isProduction,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 60 * 60 * 24 * 7,
+        });
+      }
     }
 
     const userToStore = responseData.user || { email: parsed.data.email };

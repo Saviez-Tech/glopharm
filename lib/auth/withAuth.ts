@@ -71,6 +71,38 @@ export interface WithAuthResult<T> {
   cookieResponse: NextResponse;
 }
 
+export function clearUserCookies(res: NextResponse) {
+  res.cookies.delete("accessToken");
+  res.cookies.delete("refreshToken");
+  res.cookies.delete("user");
+}
+
+export function handleUserRouteError(err: unknown): NextResponse {
+  const statusCode = isApiError(err)
+    ? err.statusCode
+    : typeof (err as { statusCode?: unknown })?.statusCode === "number"
+    ? (err as { statusCode: number }).statusCode
+    : 500;
+
+  const message =
+    err instanceof Error
+      ? err.message
+      : typeof (err as { message?: unknown })?.message === "string"
+      ? (err as { message: string }).message
+      : "Internal server error";
+
+  const res = NextResponse.json(
+    { status_code: statusCode, message, data: null },
+    { status: statusCode }
+  );
+
+  if (statusCode === 401) {
+    clearUserCookies(res);
+  }
+
+  return res;
+}
+
 export async function withAuth<T>(
   cookieStore: ReadonlyRequestCookies,
   call: (token: string | undefined) => Promise<ApiResponse<T>>
@@ -96,13 +128,20 @@ export async function withAuth<T>(
     });
   }
 
-  const tokens = await doRefresh(refreshToken); // Throws if refresh itself fails
+  try {
+    const tokens = await doRefresh(refreshToken); // Throws if refresh itself fails
 
-  // Rotate cookies on the helper response
-  cookieResponse.cookies.set("accessToken", tokens.access, cookieOptions(60 * 15));
-  cookieResponse.cookies.set("refreshToken", tokens.refresh, cookieOptions(60 * 60 * 24 * 7));
+    // Rotate cookies on the helper response
+    cookieResponse.cookies.set("accessToken", tokens.access, cookieOptions(60 * 15));
+    cookieResponse.cookies.set("refreshToken", tokens.refresh, cookieOptions(60 * 60 * 24 * 7));
 
-  // ── Retry with fresh token ────────────────────────────────────────────────
-  const data = await call(tokens.access);
-  return { data, cookieResponse };
+    // ── Retry with fresh token ────────────────────────────────────────────────
+    const data = await call(tokens.access);
+    return { data, cookieResponse };
+  } catch (refreshErr: unknown) {
+    throw Object.assign(new Error("Invalid or expired refresh token. Please log in again."), {
+      statusCode: 401,
+      cause: refreshErr,
+    });
+  }
 }

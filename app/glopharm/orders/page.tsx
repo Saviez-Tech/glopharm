@@ -1,738 +1,973 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef, Fragment } from "react";
+import { useAdmin } from "../layout";
 
-/* ------------------------------- Types & data ------------------------------ */
+/* ─────────────────────────── Types ─────────────────────────── */
 
-type Product = {
-    id: string;
-    title: string;
-    description: string;
-    price: string;
-    currency: string;
-    image: string;
-    initialQuantity: number;
-};
+export interface OrderCustomer {
+  name: string;
+  email: string;
+  phone: string;
+  is_guest: boolean;
+  user_id: number | null;
+}
 
-const MEDICAL_PRODUCTS: Product[] = [
-    { id: "m1", title: "Vitamin C 1000mg Effervescent", description: "High potency daily immune support drink tablets with orange flavour.", price: "4,500", currency: "₦", image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=500&auto=format&fit=crop&q=80", initialQuantity: 0 },
-    { id: "m2", title: "Multivitamin Daily Formula (30 caps)", description: "Comprehensive 30-in-1 vital supplement for all-day energy and wellness.", price: "8,500", currency: "₦", image: "https://images.unsplash.com/photo-1577401239170-897942555fb3?w=500&auto=format&fit=crop&q=80", initialQuantity: 0 },
-    { id: "m3", title: "Cod Liver Oil Omega-3 (90 Caps)", description: "Premium deep-sea fish oil for heart, joint, and brain health.", price: "9,800", currency: "₦", image: "https://images.unsplash.com/photo-1577401239170-897942555fb3?w=500&auto=format&fit=crop&q=80", initialQuantity: 0 },
-    { id: "m4", title: "Pain Relief Paracetamol Extra", description: "Fast-acting effective relief from headaches, body aches, and fever.", price: "1,500", currency: "₦", image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=500&auto=format&fit=crop&q=80", initialQuantity: 0 },
-    { id: "m5", title: "Antiseptic Disinfectant Liquid (500ml)", description: "Hospital-grade antiseptic for personal hygiene and wound care.", price: "2,800", currency: "₦", image: "https://images.unsplash.com/photo-1584744982491-665216d95f8b?w=500&auto=format&fit=crop&q=80", initialQuantity: 0 },
-    { id: "m6", title: "Blood Pressure Monitor (Digital)", description: "Clinically validated automatic upper-arm blood pressure monitor with memory.", price: "45,000", currency: "₦", image: "https://images.unsplash.com/photo-1615461066841-6116e61058f4?w=500&auto=format&fit=crop&q=80", initialQuantity: 0 },
-    { id: "m7", title: "Zinc & Vitamin D3 Combo (60 tabs)", description: "Immune boosting mineral combo for daily wellness and bone strength.", price: "6,200", currency: "₦", image: "https://images.unsplash.com/photo-1550831107-1553da8c8464?w=500&auto=format&fit=crop&q=80", initialQuantity: 0 },
-    { id: "m8", title: "First Aid Kit — Complete Set", description: "Comprehensive 50-piece first aid kit for home and office emergencies.", price: "18,000", currency: "₦", image: "https://images.unsplash.com/photo-1603398938378-e54eab446dde?w=500&auto=format&fit=crop&q=80", initialQuantity: 0 },
-    { id: "m9", title: "Hand Sanitizer Gel 70% (500ml)", description: "WHO-formula alcohol-based sanitizer that kills 99.9% of germs.", price: "2,200", currency: "₦", image: "https://images.unsplash.com/photo-1584744982491-665216d95f8b?w=500&auto=format&fit=crop&q=80", initialQuantity: 0 },
-    { id: "m10", title: "Glucometer Blood Sugar Test Kit", description: "Accurate digital blood glucose monitor with 25 test strips included.", price: "22,000", currency: "₦", image: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=500&auto=format&fit=crop&q=80", initialQuantity: 0 },
-    { id: "m11", title: "Probiotics Daily (30 capsules)", description: "Multi-strain probiotic formula for gut health and immune support.", price: "11,500", currency: "₦", image: "https://images.unsplash.com/photo-1550831107-1553da8c8464?w=500&auto=format&fit=crop&q=80", initialQuantity: 0 },
-    { id: "m12", title: "Thermometer Digital Infrared", description: "Non-contact forehead thermometer with 1-second reading and fever alert.", price: "14,000", currency: "₦", image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=500&auto=format&fit=crop&q=80", initialQuantity: 0 },
+export interface OrderShipping {
+  address: string;
+  city: string;
+  state: string;
+}
+
+export interface OrderItem {
+  product_id: number;
+  product_name: string;
+  product_image: string;
+  unit_price: string;
+  quantity: number;
+  line_total: string;
+}
+
+export interface OrderPayment {
+  reference: string;
+  amount: string;
+  status: string;
+  paid_at: string | null;
+  created_at: string;
+}
+
+export interface BackendOrder {
+  order_number: string;
+  created_at: string;
+  status: "pending" | "processing" | "out_for_delivery" | "delivered" | "cancelled";
+  status_label: string;
+  payment_status: "paid" | "unpaid";
+  payment_status_label: string;
+  customer: OrderCustomer;
+  shipping: OrderShipping;
+  items: OrderItem[];
+  subtotal: string;
+  referral_discount: string;
+  total: string;
+  payments: OrderPayment[];
+}
+
+export interface OrderStats {
+  period: {
+    filter: string;
+    value: string;
+  };
+  total_orders: number;
+  total_amount_sold: string;
+  orders_to_fulfil: number;
+  awaiting_payment: number;
+  by_status: {
+    pending: number;
+    processing: number;
+    out_for_delivery: number;
+    delivered: number;
+    cancelled: number;
+  };
+}
+
+const STATUS_TABS = [
+  { key: "all", label: "All Orders" },
+  { key: "pending", label: "Pending" },
+  { key: "processing", label: "Processing" },
+  { key: "out_for_delivery", label: "Out for Delivery" },
+  { key: "delivered", label: "Delivered" },
+  { key: "cancelled", label: "Cancelled" },
+] as const;
+
+type StatusTab = (typeof STATUS_TABS)[number]["key"];
+
+const ALLOWED_STATUS_UPDATES = [
+  { value: "processing", label: "Processing" },
+  { value: "out_for_delivery", label: "Out for Delivery" },
+  { value: "delivered", label: "Delivered" },
 ];
 
-type Payment = "Paid" | "Unpaid";
-type OrderStatus = "Pending" | "Shipping" | "Completed" | "Cancelled";
+/* ─────────────────────────── Helpers ─────────────────────────── */
 
-type LineItem = {
-    sku: string;
-    name: string;
-    price: number;
-    qty: number;
-    disc: number; // percent
-    total: number;
+const money = (val: string | number) => {
+  const n = typeof val === "number" ? val : parseFloat(val || "0");
+  return `₦${new Intl.NumberFormat("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(isNaN(n) ? 0 : n)}`;
 };
 
-type Order = {
-    orderId: string;
-    product: Product; // first product, used for the thumbnail
-    customer: string;
-    priceNum: number; // order total
-    ts: number;
-    payment: Payment;
-    status: OrderStatus;
-    items: LineItem[];
-    subtotal: number;
-    shipping: number;
-    discount: number;
-};
-
-/* Demo-only order data built from the sample products. */
-const CUSTOMERS = ["Leslie Alexander", "Esther Howard", "Cameron Williamson", "Jenny Wilson", "Robert Fox", "Kristin Watson"];
-const PAYMENTS: Payment[] = ["Paid", "Unpaid", "Paid", "Paid", "Unpaid", "Paid", "Unpaid", "Paid", "Paid", "Unpaid", "Paid", "Unpaid"];
-
-const SHIPPING_FEE = 1500;
-const DISCOUNTS = [5, 0, 10];
-const PAID_STATUSES: OrderStatus[] = ["Shipping", "Completed", "Pending"];
-
-const buildOrders = (): Order[] =>
-    MEDICAL_PRODUCTS.map((p, i) => {
-        const payment = PAYMENTS[i % PAYMENTS.length];
-        const status: OrderStatus = payment === "Unpaid" ? "Cancelled" : PAID_STATUSES[i % PAID_STATUSES.length];
-
-        // 1–3 line items per order (the first is always the order's own product)
-        const items: LineItem[] = Array.from({ length: (i % 3) + 1 }, (_, k) => {
-            const idx = (i + k * 5) % MEDICAL_PRODUCTS.length;
-            const prod = MEDICAL_PRODUCTS[idx];
-            const price = Number(prod.price.replace(/,/g, ""));
-            const qty = (k % 2) + 1;
-            const disc = DISCOUNTS[(i + k) % DISCOUNTS.length];
-            return { sku: `#${6548 + idx}`, name: prod.title, price, qty, disc, total: price * qty * (1 - disc / 100) };
-        });
-
-        const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
-        const discount = items.reduce((s, it) => s + it.price * it.qty * (it.disc / 100), 0);
-
-        return {
-            orderId: `0212${31 + i}`,
-            product: p,
-            customer: CUSTOMERS[i % CUSTOMERS.length],
-            priceNum: subtotal - discount + SHIPPING_FEE,
-            ts: new Date(2026, 9, 20 + i).getTime(),
-            payment,
-            status,
-            items,
-            subtotal,
-            shipping: SHIPPING_FEE,
-            discount,
-        };
+const formatDate = (iso: string) => {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
-
-const TABS = ["All Orders", "Shipping", "Completed", "Cancel"] as const;
-type Tab = (typeof TABS)[number];
-const TAB_STATUS: Record<Exclude<Tab, "All Orders">, OrderStatus> = {
-    Shipping: "Shipping",
-    Completed: "Completed",
-    Cancel: "Cancelled",
+  } catch {
+    return iso;
+  }
 };
-
-type SortKey = "orderId" | "customer" | "priceNum" | "ts";
-const PAGE_SIZE = 8;
-
-const fmtDate = (ts: number) =>
-    new Date(ts).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" });
-const money = (n: number) =>
-    `₦${new Intl.NumberFormat("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`;
-const fmtPrice = (o: Order) => money(o.priceNum);
 
 const esc = (s: string) =>
-    s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
+  String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] || c);
 
-/** Opens a clean print window with just this order's details. */
-function printOrder(o: Order) {
-    const w = window.open("", "_blank", "width=860,height=640");
-    if (!w) return;
-    const rows = o.items
-        .map(
-            (it, i) =>
-                `<tr><td>${i + 1}</td><td>${esc(it.sku)}</td><td><b>${esc(it.name)}</b></td><td>${money(it.price)}</td><td>x${it.qty}</td><td>${it.disc}%</td><td>${money(it.total)}</td></tr>`
-        )
-        .join("");
-    w.document.write(`<!doctype html><html><head><title>Order ${esc(o.orderId)}</title>
+function printReceipt(o: BackendOrder) {
+  const w = window.open("", "_blank", "width=840,height=620");
+  if (!w) return;
+
+  const rows = o.items
+    .map(
+      (it, i) =>
+        `<tr><td>${i + 1}</td><td><b>${esc(it.product_name)}</b></td><td>${money(it.unit_price)}</td><td>x${it.quantity}</td><td>${money(it.line_total)}</td></tr>`
+    )
+    .join("");
+
+  w.document.write(`<!doctype html><html><head><title>Order ${esc(o.order_number)}</title>
 <style>
-  body{font-family:system-ui,sans-serif;padding:32px;font-size:13px;color:#111}
+  body{font-family:system-ui,-apple-system,sans-serif;padding:32px;font-size:13px;color:#111}
   h2{margin:0 0 4px} p{margin:0 0 16px;color:#555}
-  table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #dbe4ff}
-  th{font-size:11px;text-transform:uppercase;color:#666}
-  .sum{margin:16px 0 0 auto;width:280px} .sum div{display:flex;justify-content:space-between;padding:4px 0}
-  .red{color:#dc2626}
+  table{width:100%;border-collapse:collapse;margin-top:16px} th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #e5e7eb}
+  th{font-size:11px;text-transform:uppercase;color:#6b7280;background:#f9fafb}
+  .sum{margin:20px 0 0 auto;width:280px} .sum div{display:flex;justify-content:space-between;padding:4px 0}
+  .total{font-weight:bold;border-top:1px solid #111;padding-top:8px;margin-top:4px}
 </style></head><body>
-  <h2>Order #${esc(o.orderId)}</h2>
-  <p>${esc(o.customer)} · ${fmtDate(o.ts)} · ${o.status}</p>
-  <table><thead><tr><th>#</th><th>SKU</th><th>Name</th><th>Price</th><th>Qty</th><th>Disc.</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
+  <h2>GloPharm Order #${esc(o.order_number)}</h2>
+  <p>Customer: ${esc(o.customer?.name || "Guest")} (${esc(o.customer?.email || "")}) · ${formatDate(o.created_at)} · Status: <b>${esc(o.status_label)}</b></p>
+  <p>Delivery Address: ${esc(o.shipping?.address || "")}, ${esc(o.shipping?.city || "")}, ${esc(o.shipping?.state || "")}</p>
+  <table><thead><tr><th>#</th><th>Product</th><th>Unit Price</th><th>Qty</th><th>Line Total</th></tr></thead><tbody>${rows}</tbody></table>
   <div class="sum">
     <div><span>Subtotal</span><span>${money(o.subtotal)}</span></div>
-    <div><span>Shipping</span><span>${money(o.shipping)}</span></div>
-    <div class="red"><span>Discount</span><span>${money(o.discount)}</span></div>
-    <div><b>Total</b><b>${money(o.priceNum)}</b></div>
+    <div><span>Discount</span><span>-${money(o.referral_discount)}</span></div>
+    <div class="total"><span>Total</span><span>${money(o.total)}</span></div>
   </div>
 </body></html>`);
-    w.document.close();
-    w.focus();
-    w.print();
+  w.document.close();
+  w.focus();
+  w.print();
 }
 
-/* --------------------------------- Icons ---------------------------------- */
+/* ─────────────────────────── Toast ─────────────────────────── */
 
-const Svg = ({ children, className = "h-4 w-4" }: { children: React.ReactNode; className?: string }) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
-        {children}
-    </svg>
-);
-const SearchIcon = () => (<Svg><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></Svg>);
-const FilterIcon = () => (<Svg><path d="M4 6h16M7 12h10M10 18h4" /></Svg>);
-const ExportIcon = () => (<Svg><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14" /></Svg>);
-const PlusIcon = () => (<Svg><path d="M12 5v14M5 12h14" /></Svg>);
-const EyeIcon = () => (<Svg><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></Svg>);
-const EditIcon = () => (<Svg><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></Svg>);
-const TrashIcon = () => (<Svg><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14" /></Svg>);
-const ChevronLeft = () => (<Svg><path d="m15 18-6-6 6-6" /></Svg>);
-const ChevronRight = () => (<Svg><path d="m9 18 6-6-6-6" /></Svg>);
-const ChevronDown = () => (<Svg><path d="m6 9 6 6 6-6" /></Svg>);
-const ChevronUp = () => (<Svg><path d="m18 15-6-6-6 6" /></Svg>);
-const CaretRight = () => (<svg viewBox="0 0 8 10" className="h-2.5 w-2 fill-current" aria-hidden><path d="M0 0l8 5-8 5z" /></svg>);
+type ToastType = "success" | "error";
+interface ToastItem { id: number; msg: string; type: ToastType }
 
-const SortCaret = ({ active, dir }: { active: boolean; dir: "asc" | "desc" }) => (
-    <span className="ml-1.5 inline-flex flex-col gap-[2px]">
-        <svg viewBox="0 0 8 5" className={`h-[5px] w-2 ${active && dir === "asc" ? "fill-gray-800" : "fill-gray-400"}`}><path d="M4 0l4 5H0z" /></svg>
-        <svg viewBox="0 0 8 5" className={`h-[5px] w-2 ${active && dir === "desc" ? "fill-gray-800" : "fill-gray-400"}`}><path d="M4 5 0 0h8z" /></svg>
-    </span>
-);
-
-const FilterCaret = () => (
-    <svg viewBox="0 0 24 24" className="ml-1.5 inline h-3 w-3 text-gray-400" fill="currentColor" aria-hidden>
-        <path d="M3 4h18l-7 8v7l-4 2v-9Z" />
-    </svg>
-);
-
-/* --------------------------------- Badges --------------------------------- */
-
-const PAYMENT_STYLE: Record<Payment, string> = {
-    Paid: "bg-lime-200 text-lime-800",
-    Unpaid: "bg-yellow-100 text-yellow-700",
-};
-/** The 4 delivery statuses offered in the Edit dropdown. */
-const STATUS_OPTIONS: OrderStatus[] = ["Pending", "Shipping", "Completed", "Cancelled"];
-
-const STATUS_STYLE: Record<OrderStatus, string> = {
-    Pending: "bg-sky-100 text-sky-700",
-    Shipping: "bg-purple-200 text-purple-700",
-    Completed: "bg-green-200 text-green-800",
-    Cancelled: "bg-orange-200 text-orange-700",
-};
-
-const Badge = ({ className, children }: { className: string; children: React.ReactNode }) => (
-    <span className={`inline-block whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-medium ${className}`}>{children}</span>
-);
-
-function Actions({
-    viewing,
-    editing,
-    onView,
-    onEdit,
-    onDelete,
-}: {
-    viewing: boolean;
-    editing: boolean;
-    onView: () => void;
-    onEdit: (rect: DOMRect) => void;
-    onDelete: () => void;
-}) {
-    return (
-        <div className="flex items-center gap-3.5 text-gray-600">
-            <button
-                aria-label="View order details"
-                aria-pressed={viewing}
-                onClick={onView}
-                className={`hover:text-blue-600 ${viewing ? "text-blue-600" : ""}`}
-            >
-                <EyeIcon />
-            </button>
-            <button
-                aria-label="Change delivery status"
-                aria-haspopup="menu"
-                aria-expanded={editing}
-                onClick={(e) => onEdit(e.currentTarget.getBoundingClientRect())}
-                className={`hover:text-blue-600 ${editing ? "text-blue-600" : ""}`}
-            >
-                <EditIcon />
-            </button>
-            <button aria-label="Delete" onClick={onDelete} className="hover:text-red-600"><TrashIcon /></button>
-        </div>
-    );
+function useToast() {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const counter = useRef(0);
+  const push = useCallback((msg: string, type: ToastType = "success") => {
+    const id = ++counter.current;
+    setToasts((p) => [...p, { id, msg, type }]);
+    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
+  }, []);
+  return { toasts, push };
 }
 
-const DETAIL_COLS = "grid grid-cols-[28px_90px_minmax(160px,1.6fr)_1fr_56px_56px_1fr_72px] gap-x-2";
+/* ─────────────────────────── Component ─────────────────────────── */
 
-function OrderDetails({ o }: { o: Order }) {
-    return (
-        <div className="overflow-x-auto bg-gray-50/70">
-            <div className="min-w-[640px] px-4 text-xs sm:px-6">
-                {/* Header */}
-                <div className={`${DETAIL_COLS} items-center border-b border-blue-100 py-2.5 text-[10px] font-medium uppercase tracking-wide text-gray-500`}>
-                    <span>#</span>
-                    <span>SKU</span>
-                    <span>Name</span>
-                    <span>Price</span>
-                    <span>Qty</span>
-                    <span>Disc.</span>
-                    <span>Total</span>
-                    <button
-                        onClick={() => printOrder(o)}
-                        className="flex items-center justify-end gap-1 uppercase text-gray-500 hover:text-blue-600"
-                    >
-                        <Svg className="h-3.5 w-3.5">
-                            <path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M7 14h10v7H7z" />
-                        </Svg>
-                        Print
-                    </button>
-                </div>
+export default function AdminOrdersPage() {
+  const { darkMode } = useAdmin();
+  const { toasts, push: toast } = useToast();
 
-                {/* Line items */}
-                {o.items.map((it, idx) => (
-                    <div key={`${it.sku}-${idx}`} className={`${DETAIL_COLS} items-center border-b border-blue-100 py-3.5 text-gray-800`}>
-                        <span className="text-gray-500">{idx + 1}</span>
-                        <span className="text-gray-600">{it.sku}</span>
-                        <span className="truncate pr-2 font-semibold" title={it.name}>{it.name}</span>
-                        <span>{money(it.price)}</span>
-                        <span>x{it.qty}</span>
-                        <span className={it.disc > 0 ? "text-red-500" : "text-gray-400"}>{it.disc}%</span>
-                        <span>{money(it.total)}</span>
-                        <button aria-label="More options" className="justify-self-end pr-3 text-base font-bold leading-none tracking-widest text-gray-800 hover:text-blue-600">
-                            •••
-                        </button>
-                    </div>
-                ))}
+  const [orders, setOrders] = useState<BackendOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-                {/* Summary */}
-                <div className="pb-4 pt-3 text-gray-800">
-                    <div className={`${DETAIL_COLS} py-1.5`}>
-                        <span className="col-span-2 col-start-5 text-gray-500">Subtotal</span>
-                        <span className="col-start-7">{money(o.subtotal)}</span>
-                    </div>
-                    <div className={`${DETAIL_COLS} py-1.5`}>
-                        <span className="col-span-2 col-start-5 text-gray-500">Shipping</span>
-                        <span className="col-start-7">{money(o.shipping)}</span>
-                    </div>
-                    <div className={`${DETAIL_COLS} py-1.5`}>
-                        <span className="col-span-2 col-start-5 text-gray-500">Discount</span>
-                        <span className="col-start-7 text-red-500">{money(o.discount)}</span>
-                    </div>
-                    <div className={`${DETAIL_COLS} py-1.5`}>
-                        <span className="col-span-2 col-start-5 text-gray-500">Total</span>
-                        <span className="col-start-7 font-bold">{money(o.priceNum)}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
+  const [stats, setStats] = useState<OrderStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [period, setPeriod] = useState<"today" | "this_month" | "this_year">("today");
 
-function OrderCell({ o }: { o: Order }) {
-    return (
-        <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={o.product.image} alt={o.product.title} className="h-10 w-10 shrink-0 rounded-md border border-gray-200 bg-gray-50 object-cover" />
-            <div className="min-w-0">
-                <a href="#" className="text-[11px] font-medium text-blue-600 hover:underline">{o.orderId}</a>
-                <p className="max-w-[220px] truncate text-xs font-medium text-gray-800" title={o.product.description}>
-                    {o.product.title}
-                </p>
-            </div>
-        </div>
-    );
-}
+  const [activeTab, setActiveTab] = useState<StatusTab>("all");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
 
-/* ---------------------------------- Page ---------------------------------- */
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
-export default function OrdersPage() {
-    const [orders, setOrders] = useState<Order[]>(buildOrders);
-    const [query, setQuery] = useState("");
-    const [tab, setTab] = useState<Tab>("All Orders");
-    const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" } | null>(null);
-    const [page, setPage] = useState(1);
-    const [selected, setSelected] = useState<Set<string>>(new Set());
-    const [open, setOpen] = useState<Set<string>>(new Set()); // expanded rows (mobile)
-    const [viewing, setViewing] = useState<Set<string>>(new Set()); // rows showing order details
-    const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null); // status dropdown
+  // Status Update Modal state
+  const [statusModalOrder, setStatusModalOrder] = useState<BackendOrder | null>(null);
+  const [newStatus, setNewStatus] = useState("out_for_delivery");
+  const [statusNote, setStatusNote] = useState("");
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-    // Close the status dropdown on scroll / resize / Escape
-    useEffect(() => {
-        if (!menu) return;
-        const close = () => setMenu(null);
-        const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
-        window.addEventListener("scroll", close, true);
-        window.addEventListener("resize", close);
-        window.addEventListener("keydown", onKey);
-        return () => {
-            window.removeEventListener("scroll", close, true);
-            window.removeEventListener("resize", close);
-            window.removeEventListener("keydown", onKey);
-        };
-    }, [menu]);
+  /* ── Fetch Stats ── */
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const res = await fetch(`/api/gload/orders/stats?period=${period}`);
+      if (res.status === 401) {
+        window.location.href = "/glopharm/login?session_expired=1";
+        return;
+      }
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setStats(json.data as OrderStats);
+      }
+    } catch {
+      // stats error fallback
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [period]);
 
-    const openMenu = (id: string, rect: DOMRect) => {
-        const W = 192;
-        const H = 210;
-        const x = Math.max(8, Math.min(rect.right - W, window.innerWidth - W - 8));
-        const below = rect.bottom + 6;
-        const y = below + H > window.innerHeight ? Math.max(8, rect.top - H - 6) : below;
-        setMenu({ id, x, y });
-    };
+  /* ── Fetch Orders List ── */
+  const fetchOrders = useCallback(async (p = page, q = search, status = activeTab) => {
+    setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({
+        page: String(p),
+        page_size: "20",
+        _t: String(Date.now()),
+      });
 
-    const changeStatus = (id: string, status: OrderStatus) => {
-        setOrders((prev) => prev.map((o) => (o.orderId === id ? { ...o, status } : o)));
-        setMenu(null);
-    };
+      if (q.trim()) params.set("search", q.trim());
+      if (status !== "all") params.set("status", status);
 
-    const menuOrder = menu ? orders.find((o) => o.orderId === menu.id) : undefined;
+      const res = await fetch(`/api/gload/orders?${params.toString()}`, { cache: "no-store" });
+      if (res.status === 401) {
+        window.location.href = "/glopharm/login?session_expired=1";
+        return;
+      }
+      const json = await res.json();
 
-    const tabCount = (t: Tab) =>
-        t === "All Orders" ? orders.length : orders.filter((o) => o.status === TAB_STATUS[t]).length;
+      if (!res.ok) {
+        setError(json.message || "Failed to load orders.");
+        return;
+      }
 
-    const filtered = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        let list = orders.filter(
-            (o) =>
-                (tab === "All Orders" || o.status === TAB_STATUS[tab]) &&
-                (!q ||
-                    o.orderId.includes(q) ||
-                    o.product.title.toLowerCase().includes(q) ||
-                    o.customer.toLowerCase().includes(q))
-        );
-        if (sort) {
-            const { key, dir } = sort;
-            list = [...list].sort((a, b) => {
-                const av = a[key];
-                const bv = b[key];
-                const res = av < bv ? -1 : av > bv ? 1 : 0;
-                return dir === "asc" ? res : -res;
-            });
-        }
-        return list;
-    }, [orders, query, tab, sort]);
+      const results = json.data?.results ?? (Array.isArray(json.data) ? json.data : []);
+      setOrders(results);
+      setTotalCount(json.data?.count ?? results.length);
+      setHasNext(Boolean(json.data?.next));
+      setHasPrev(Boolean(json.data?.previous));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unable to load orders.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, search, activeTab]);
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-    const safePage = Math.min(page, totalPages);
-    const start = (safePage - 1) * PAGE_SIZE;
-    const visible = filtered.slice(start, start + PAGE_SIZE);
-    const allSelected = visible.length > 0 && visible.every((o) => selected.has(o.orderId));
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
-    const toggleSort = (key: SortKey) =>
-        setSort((s) => (s?.key === key ? (s.dir === "asc" ? { key, dir: "desc" } : null) : { key, dir: "asc" }));
+  useEffect(() => {
+    fetchOrders(page, search, activeTab);
+  }, [fetchOrders, page, search, activeTab]);
 
-    const toggleIn = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) =>
-        setter((prev) => {
-            const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
-            return next;
-        });
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    setSearch(searchInput);
+  };
 
-    const toggleAll = () =>
-        setSelected((prev) => {
-            const next = new Set(prev);
-            visible.forEach((o) => (allSelected ? next.delete(o.orderId) : next.add(o.orderId)));
-            return next;
-        });
+  const toggleExpand = (orderNumber: string) => {
+    setExpandedOrders((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderNumber)) next.delete(orderNumber);
+      else next.add(orderNumber);
+      return next;
+    });
+  };
 
-    const deleteOrder = (id: string) => {
-        setOrders((prev) => prev.filter((o) => o.orderId !== id));
-        setSelected((prev) => {
-            const next = new Set(prev);
-            next.delete(id);
-            return next;
-        });
-    };
+  /* ── Execute Status Change ── */
+  const handleUpdateStatus = async () => {
+    if (!statusModalOrder) return;
 
-    const SortTh = ({ label, k }: { label: string; k: SortKey }) => (
-        <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-700">
-            <button onClick={() => toggleSort(k)} className="inline-flex items-center hover:text-gray-900">
-                {label}
-                <SortCaret active={sort?.key === k} dir={sort?.dir ?? "asc"} />
-            </button>
-        </th>
-    );
+    setIsUpdatingStatus(true);
+    try {
+      const res = await fetch(`/api/gload/orders/${statusModalOrder.order_number}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: newStatus,
+          note: statusNote.trim() || undefined,
+        }),
+      });
 
-    const tabLabel = tab === "All Orders" ? "All Orders" : tab;
+      const json = await res.json();
 
-    return (
-        <div className="p-6">
-            {/* Title + breadcrumb */}
-            <h1 className="text-2xl font-semibold text-gray-900">Orders</h1>
-            <nav className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                <span>Dashboard</span>
-                <CaretRight />
-                <span>Orders</span>
-                <CaretRight />
-                <span className="font-medium text-blue-600">{tabLabel}</span>
-            </nav>
+      if (!res.ok) {
+        throw new Error(json.message || "Failed to update order status.");
+      }
 
-            {/* Stat cards */}
-            <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
-                <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-sm">
-                    <p className="text-sm font-semibold">Total Orders</p>
-                    <p className="mt-4 text-3xl font-semibold">{orders.length}</p>
-                    <p className="mt-1 text-[11px] text-white/80">All time orders</p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm font-semibold text-gray-800">Shipping</p>
-                    <p className="mt-4 text-3xl font-semibold text-blue-600">{orders.filter(o => o.status === 'Shipping').length}</p>
-                    <p className="mt-1 text-[11px] text-gray-500">In transit</p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm font-semibold text-gray-800">Completed</p>
-                    <p className="mt-4 text-3xl font-semibold text-blue-600">{orders.filter(o => o.status === 'Completed').length}</p>
-                    <p className="mt-1 text-[11px] text-gray-500">Delivered orders</p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm font-semibold text-gray-800">Cancelled</p>
-                    <p className="mt-4 text-3xl font-semibold text-blue-600">{orders.filter(o => o.status === 'Cancelled').length}</p>
-                    <p className="mt-1 text-[11px] text-gray-500">Unpaid / cancelled</p>
-                </div>
-            </div>
+      toast(`Order #${statusModalOrder.order_number} status updated to ${newStatus.replace(/_/g, " ")}!`);
 
-            <section className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-                {/* Toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="relative hidden w-full max-w-sm md:block">
-                        <input
-                            value={query}
-                            onChange={(e) => {
-                                setQuery(e.target.value);
-                                setPage(1);
-                            }}
-                            placeholder="Search for iid, name product"
-                            className="w-full rounded-full border border-gray-300 bg-white py-2 pl-4 pr-10 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        />
-                        <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-600">
-                            <SearchIcon />
-                        </span>
-                    </div>
+      // Optimistically update order status in state
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.order_number === statusModalOrder.order_number
+            ? {
+              ...o,
+              status: newStatus as BackendOrder["status"],
+              status_label:
+                ALLOWED_STATUS_UPDATES.find((s) => s.value === newStatus)?.label || newStatus,
+            }
+            : o
+        )
+      );
 
-                    {/* Tabs shown above the buttons on mobile */}
-                    <div className="order-first w-full md:hidden">
-                        <TabBar tab={tab} setTab={(t) => { setTab(t); setPage(1); }} count={tabCount} />
-                    </div>
+      setStatusModalOrder(null);
+      setStatusNote("");
+      fetchStats();
+      fetchOrders(page, search, activeTab);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update status.";
+      toast(msg, "error");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
-                    <div className="flex w-full items-center justify-between gap-3 md:w-auto md:justify-end">
-                        <div className="flex items-center gap-3">
-                            <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3.5 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50">
-                                Filter <FilterIcon />
-                            </button>
-                            <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3.5 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50">
-                                Export <ExportIcon />
-                            </button>
-                        </div>
-                        <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700">
-                            New Order <PlusIcon />
-                        </button>
-                    </div>
-                </div>
+  const totalPages = Math.max(1, Math.ceil(totalCount / 20));
 
-                {/* Tabs (desktop) */}
-                <div className="mt-4 hidden md:block">
-                    <TabBar tab={tab} setTab={(t) => { setTab(t); setPage(1); }} count={tabCount} />
-                </div>
+  const cardCls = darkMode ? "bg-[#383838] border-[#505050]" : "bg-white border-[#E8E8E8]";
+  const textCls = darkMode ? "text-white" : "text-[#282828]";
 
-                {/* ------------------------- Desktop table ------------------------- */}
-                <div className="mt-4 hidden overflow-x-auto rounded-xl border border-gray-200 md:block">
-                    <table className="w-full min-w-[860px] border-collapse">
-                        <thead className="bg-gray-100">
-                            <tr>
-                                <th className="w-12 px-4 py-3.5">
-                                    <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all" className="h-4 w-4 rounded border-gray-300 accent-blue-600" />
-                                </th>
-                                <SortTh label="Orders" k="orderId" />
-                                <SortTh label="Customer" k="customer" />
-                                <SortTh label="Price" k="priceNum" />
-                                <SortTh label="Date" k="ts" />
-                                <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-700">Payment <FilterCaret /></th>
-                                <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-700">Status <FilterCaret /></th>
-                                <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-700">Action <FilterCaret /></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {visible.length === 0 && (
-                                <tr>
-                                    <td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-500">No orders found.</td>
-                                </tr>
-                            )}
-                            {visible.map((o) => (
-                                <Fragment key={o.orderId}>
-                                    <tr className="hover:bg-gray-50/70">
-                                        <td className="px-4 py-3">
-                                            <input type="checkbox" checked={selected.has(o.orderId)} onChange={() => toggleIn(setSelected, o.orderId)} aria-label={`Select order ${o.orderId}`} className="h-4 w-4 rounded border-gray-300 accent-blue-600" />
-                                        </td>
-                                        <td className="px-4 py-3"><OrderCell o={o} /></td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-700">{o.customer}</td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-700">{fmtPrice(o)}</td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-700">{fmtDate(o.ts)}</td>
-                                        <td className="px-4 py-3"><Badge className={PAYMENT_STYLE[o.payment]}>{o.payment}</Badge></td>
-                                        <td className="px-4 py-3"><Badge className={STATUS_STYLE[o.status]}>{o.status}</Badge></td>
-                                        <td className="px-4 py-3">
-                                            <Actions
-                                                viewing={viewing.has(o.orderId)}
-                                                editing={menu?.id === o.orderId}
-                                                onView={() => toggleIn(setViewing, o.orderId)}
-                                                onEdit={(rect) => openMenu(o.orderId, rect)}
-                                                onDelete={() => deleteOrder(o.orderId)}
-                                            />
-                                        </td>
-                                    </tr>
-                                    {viewing.has(o.orderId) && (
-                                        <tr>
-                                            <td colSpan={8} className="p-0">
-                                                <OrderDetails o={o} />
-                                            </td>
-                                        </tr>
-                                    )}
-                                </Fragment>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "processing":
+        return "bg-blue-100 text-blue-800";
+      case "out_for_delivery":
+        return "bg-purple-100 text-purple-800";
+      case "delivered":
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      case "pending":
+      default:
+        return "bg-yellow-100 text-yellow-800";
+    }
+  };
 
-                {/* ------------------------- Mobile expandable list ------------------------- */}
-                <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 md:hidden">
-                    <div className="flex items-center bg-gray-100 px-4 py-3 text-xs font-semibold text-gray-700">
-                        <button onClick={() => toggleSort("orderId")} className="inline-flex items-center">
-                            Order <SortCaret active={sort?.key === "orderId"} dir={sort?.dir ?? "asc"} />
-                        </button>
-                    </div>
+  return (
+    <div className="space-y-6">
+      {/* Toast Notification Stack */}
+      <div className="fixed top-5 right-5 z-[100] flex flex-col gap-2 pointer-events-none">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-medium text-white shadow-lg ${t.type === "success" ? "bg-[#282828]" : "bg-red-600"
+              }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${t.type === "success" ? "bg-[#E6FF96]" : "bg-red-200"}`} />
+            {t.msg}
+          </div>
+        ))}
+      </div>
 
-                    {visible.length === 0 && <p className="px-4 py-10 text-center text-sm text-gray-500">No orders found.</p>}
+      {/* ── Status Update Modal ── */}
+      {statusModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl ${cardCls}`}>
+            <h3 className={`text-base font-bold mb-1 ${textCls}`}>
+              Update Status: #{statusModalOrder.order_number}
+            </h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Current status: <span className="font-semibold capitalize">{statusModalOrder.status_label}</span>
+            </p>
 
-                    <ul className="divide-y divide-gray-100">
-                        {visible.map((o) => {
-                            const isOpen = open.has(o.orderId);
-                            return (
-                                <li key={o.orderId} className="px-4 py-3">
-                                    <div className="flex items-center gap-3">
-                                        <input type="checkbox" checked={selected.has(o.orderId)} onChange={() => toggleIn(setSelected, o.orderId)} aria-label={`Select order ${o.orderId}`} className="h-4 w-4 shrink-0 rounded border-gray-300 accent-blue-600" />
-                                        <div className="min-w-0 flex-1"><OrderCell o={o} /></div>
-                                        <button
-                                            onClick={() => toggleIn(setOpen, o.orderId)}
-                                            aria-expanded={isOpen}
-                                            aria-label={isOpen ? "Collapse" : "Expand"}
-                                            className="rounded-md border border-gray-300 p-1 text-gray-700"
-                                        >
-                                            {isOpen ? <ChevronUp /> : <ChevronDown />}
-                                        </button>
-                                    </div>
-
-                                    {isOpen && (
-                                        <dl className="mt-3 grid grid-cols-[80px_1fr] items-center gap-y-3 pl-7 text-xs">
-                                            <dt className="text-gray-500">Customer</dt><dd className="text-gray-800">{o.customer}</dd>
-                                            <dt className="text-gray-500">Price</dt><dd className="text-gray-800">{fmtPrice(o)}</dd>
-                                            <dt className="text-gray-500">Date</dt><dd className="text-gray-800">{fmtDate(o.ts)}</dd>
-                                            <dt className="text-gray-500">Payment</dt><dd><Badge className={PAYMENT_STYLE[o.payment]}>{o.payment}</Badge></dd>
-                                            <dt className="text-gray-500">Status</dt><dd><Badge className={STATUS_STYLE[o.status]}>{o.status}</Badge></dd>
-                                            <dt className="text-gray-500">Action</dt>
-                                            <dd>
-                                                <Actions
-                                                    viewing={viewing.has(o.orderId)}
-                                                    editing={menu?.id === o.orderId}
-                                                    onView={() => toggleIn(setViewing, o.orderId)}
-                                                    onEdit={(rect) => openMenu(o.orderId, rect)}
-                                                    onDelete={() => deleteOrder(o.orderId)}
-                                                />
-                                            </dd>
-                                        </dl>
-                                    )}
-
-                                    {viewing.has(o.orderId) && (
-                                        <div className="-mx-4 mt-3 border-t border-blue-100">
-                                            <OrderDetails o={o} />
-                                        </div>
-                                    )}
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </div>
-
-                {/* Pagination */}
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600">
-                    <p>
-                        <span className="font-semibold text-blue-600">
-                            {filtered.length === 0 ? 0 : start + 1} - {Math.min(start + PAGE_SIZE, filtered.length)}
-                        </span>{" "}
-                        of {filtered.length} Items
-                    </p>
-
-                    <div className="flex items-center gap-2">
-                        <span>The page on</span>
-                        <select
-                            value={safePage}
-                            onChange={(e) => setPage(Number(e.target.value))}
-                            className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-500"
-                        >
-                            {Array.from({ length: totalPages }, (_, i) => (
-                                <option key={i + 1} value={i + 1}>{i + 1}</option>
-                            ))}
-                        </select>
-                        <button
-                            onClick={() => setPage(Math.max(1, safePage - 1))}
-                            disabled={safePage === 1}
-                            aria-label="Previous page"
-                            className="rounded-md border border-gray-300 p-1.5 text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                            <ChevronLeft />
-                        </button>
-                        <button
-                            onClick={() => setPage(Math.min(totalPages, safePage + 1))}
-                            disabled={safePage === totalPages}
-                            aria-label="Next page"
-                            className="rounded-md border border-gray-300 p-1.5 text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                            <ChevronRight />
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            {/* Delivery-status dropdown (fixed so it is never clipped by the table) */}
-            {menu && menuOrder && (
-                <>
-                    <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} />
-                    <div
-                        role="menu"
-                        aria-label="Delivery status"
-                        className="fixed z-50 w-48 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg"
-                        style={{ left: menu.x, top: menu.y }}
-                    >
-                        <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                            Delivery status
-                        </p>
-                        {STATUS_OPTIONS.map((s) => {
-                            const active = menuOrder.status === s;
-                            return (
-                                <button
-                                    key={s}
-                                    role="menuitemradio"
-                                    aria-checked={active}
-                                    onClick={() => changeStatus(menuOrder.orderId, s)}
-                                    className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left hover:bg-gray-50 ${active ? "bg-gray-50" : ""
-                                        }`}
-                                >
-                                    <Badge className={STATUS_STYLE[s]}>{s}</Badge>
-                                    {active && (
-                                        <Svg className="h-4 w-4 text-blue-600">
-                                            <path d="m5 12.5 4.5 4.5L19 7.5" />
-                                        </Svg>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </>
-            )}
-        </div>
-    );
-}
-
-/* ------------------------------ Tab bar (shared) ------------------------------ */
-
-function TabBar({
-    tab,
-    setTab,
-    count,
-}: {
-    tab: Tab;
-    setTab: (t: Tab) => void;
-    count: (t: Tab) => number;
-}) {
-    return (
-        <div className="flex rounded-xl border border-gray-200 p-1">
-            {TABS.map((t) => (
-                <button
-                    key={t}
-                    onClick={() => setTab(t)}
-                    className={`flex flex-1 flex-col items-center justify-center rounded-lg px-2 py-1.5 text-[11px] font-semibold leading-tight transition-colors md:flex-row md:gap-1 md:px-4 md:py-2 md:text-xs ${tab === t ? "bg-blue-100 text-blue-600" : "text-gray-700 hover:bg-gray-50"
-                        }`}
+            <div className="space-y-3">
+              <div>
+                <label className={`block text-xs font-semibold mb-1 ${textCls}`}>Select New Status *</label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className={`w-full px-3 py-2.5 text-xs rounded-xl border outline-none ${darkMode ? "bg-[#505050] border-[#666] text-white" : "bg-white border-[#E8E8E8] text-[#282828]"
+                    } focus:border-[#1d68ff]`}
                 >
-                    <span>{t}</span>
-                    <span>({count(t)})</span>
-                </button>
-            ))}
+                  {ALLOWED_STATUS_UPDATES.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Permitted transitions: Processing, Out for Delivery, Delivered.
+                </p>
+              </div>
+
+              <div>
+                <label className={`block text-xs font-semibold mb-1 ${textCls}`}>Note (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Rider has picked it up or Dispatched from pharmacy"
+                  value={statusNote}
+                  onChange={(e) => setStatusNote(e.target.value)}
+                  className={`w-full px-3 py-2.5 text-xs rounded-xl border outline-none ${darkMode ? "bg-[#505050] border-[#666] text-white" : "bg-white border-[#E8E8E8] text-[#282828]"
+                    } focus:border-[#1d68ff]`}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 mt-6 pt-3 border-t border-[#E8E8E8]">
+              <button
+                type="button"
+                onClick={() => setStatusModalOrder(null)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold border ${darkMode ? "border-[#666] text-white hover:bg-[#505050]" : "border-[#E8E8E8] text-[#282828] hover:bg-gray-50"
+                  }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isUpdatingStatus}
+                onClick={handleUpdateStatus}
+                className="px-5 py-2 rounded-xl bg-[#1d68ff] hover:bg-[#1656d6] text-white text-xs font-semibold disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+              >
+                {isUpdatingStatus ? "Updating..." : "Confirm Status"}
+              </button>
+            </div>
+          </div>
         </div>
-    );
+      )}
+
+      {/* ── BREADCRUMB & HEADER ── */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className={`text-2xl font-bold tracking-tight ${textCls}`}>Manage Orders</h1>
+          <nav className="mt-1 flex items-center gap-2 text-xs text-[#888888]">
+            <span>Dashboard</span>
+            <span>&gt;</span>
+            <span className="font-medium text-[#1d68ff]">Orders</span>
+          </nav>
+        </div>
+
+        {/* Period filter for stats */}
+        <div className="flex items-center gap-2 text-xs">
+          <span className={textCls}>Period:</span>
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value as typeof period)}
+            className={`px-3 py-1.5 rounded-xl border text-xs outline-none font-medium cursor-pointer ${darkMode ? "bg-[#505050] border-[#666] text-white" : "bg-white border-[#E8E8E8] text-[#282828]"
+              }`}
+          >
+            <option value="today">Today</option>
+            <option value="this_month">This Month</option>
+            <option value="this_year">This Year</option>
+          </select>
+        </div>
+      </div>
+
+      {/* ── STATS CARDS ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {statsLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={`rounded-2xl border p-5 animate-pulse h-28 ${cardCls}`} />
+          ))
+        ) : stats ? (
+          <>
+            <div className="rounded-2xl p-5 shadow-sm bg-[#1d68ff] text-white">
+              <p className="text-sm font-semibold">
+                Total Orders (
+                {stats.period?.filter === "this_month"
+                  ? "This Month"
+                  : stats.period?.filter === "this_year"
+                  ? "This Year"
+                  : "Today"}
+                )
+              </p>
+              <p className="mt-3 text-3xl font-bold">{stats.total_orders}</p>
+              <p className="mt-1 text-[11px] text-white/80">Date: {stats.period.value}</p>
+            </div>
+            <div className={`rounded-2xl border p-5 shadow-sm ${cardCls}`}>
+              <p className="text-sm font-semibold text-gray-500">Total Sold</p>
+              <p className="mt-3 text-3xl font-bold text-[#1d68ff]">{money(stats.total_amount_sold)}</p>
+              <p className="mt-1 text-[11px] text-gray-400">Successful sales in period</p>
+            </div>
+            <div className={`rounded-2xl border p-5 shadow-sm ${cardCls}`}>
+              <p className="text-sm font-semibold text-gray-500">Orders to Fulfil</p>
+              <p className="mt-3 text-3xl font-bold text-amber-500">{stats.orders_to_fulfil}</p>
+              <p className="mt-1 text-[11px] text-gray-400">Processing or awaiting shipment</p>
+            </div>
+            <div className={`rounded-2xl border p-5 shadow-sm ${cardCls}`}>
+              <p className="text-sm font-semibold text-gray-500">Awaiting Payment</p>
+              <p className="mt-3 text-3xl font-bold text-red-500">{stats.awaiting_payment}</p>
+              <p className="mt-1 text-[11px] text-gray-400">Pending checkout / transfers</p>
+            </div>
+          </>
+        ) : (
+          <p className="col-span-4 text-xs text-gray-500">Could not load order stats.</p>
+        )}
+      </div>
+
+      {/* ── ORDERS TABLE CONTAINER ── */}
+      <section className={`rounded-2xl border shadow-sm p-5 ${cardCls}`}>
+        {/* Toolbar & Search */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <form onSubmit={handleSearchSubmit} className="flex gap-2 w-full max-w-sm">
+            <input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search by order # or customer..."
+              className={`w-full rounded-full border py-2 pl-4 pr-4 text-xs outline-none placeholder:text-gray-400 focus:border-[#1d68ff] ${darkMode ? "bg-[#505050] border-[#666] text-white" : "bg-white border-[#E8E8E8] text-[#282828]"
+                }`}
+            />
+            <button
+              type="submit"
+              className="rounded-full bg-[#1d68ff] px-4 py-2 text-xs font-semibold text-white hover:bg-[#1656d6] cursor-pointer"
+            >
+              Search
+            </button>
+          </form>
+
+          <button
+            onClick={() => {
+              fetchStats();
+              fetchOrders(page, search, activeTab);
+              toast("Orders refreshed!");
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
+        </div>
+
+        {/* Status Filter Tabs */}
+        <div className={`mt-4 flex overflow-x-auto rounded-xl border p-1 gap-1 ${darkMode ? "border-[#505050]" : "border-[#E8E8E8]"}`}>
+          {STATUS_TABS.map((t) => {
+            const count =
+              t.key === "all"
+                ? totalCount
+                : stats?.by_status?.[t.key as keyof typeof stats.by_status] ?? 0;
+            const active = activeTab === t.key;
+
+            return (
+              <button
+                key={t.key}
+                onClick={() => {
+                  setActiveTab(t.key);
+                  setPage(1);
+                }}
+                className={`whitespace-nowrap rounded-lg px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${active ? "bg-blue-100 text-[#1d68ff]" : "text-gray-600 hover:bg-gray-50"
+                  }`}
+              >
+                {t.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Table */}
+        <div className={`mt-4 overflow-x-auto rounded-xl border ${darkMode ? "border-[#505050]" : "border-[#E8E8E8]"}`}>
+          <table className="w-full min-w-[800px] border-collapse">
+            <thead className={darkMode ? "bg-[#505050]" : "bg-gray-100"}>
+              <tr>
+                <th className={`px-4 py-3.5 text-left text-xs font-semibold ${textCls}`}>Order #</th>
+                <th className={`px-4 py-3.5 text-left text-xs font-semibold ${textCls}`}>Customer</th>
+                <th className={`px-4 py-3.5 text-left text-xs font-semibold ${textCls}`}>Date</th>
+                <th className={`px-4 py-3.5 text-left text-xs font-semibold ${textCls}`}>Total</th>
+                <th className={`px-4 py-3.5 text-left text-xs font-semibold ${textCls}`}>Payment</th>
+                <th className={`px-4 py-3.5 text-left text-xs font-semibold ${textCls}`}>Status</th>
+                <th className={`px-4 py-3.5 text-left text-xs font-semibold ${textCls}`}>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody className={`divide-y ${darkMode ? "divide-[#505050]" : "divide-gray-100"}`}>
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: 7 }).map((__, j) => (
+                      <td key={j} className="px-4 py-4">
+                        <div className="h-3 w-20 animate-pulse rounded bg-gray-200" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : error ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-red-500">
+                    {error}
+                  </td>
+                </tr>
+              ) : orders.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-400">
+                    No orders found.
+                  </td>
+                </tr>
+              ) : (
+                orders.map((o) => {
+                  const isExpanded = expandedOrders.has(o.order_number);
+                  const isPaid = o.payment_status === "paid";
+                  const paymentRef = o.payments?.[0]?.reference || "N/A";
+                  const paidAtTime = o.payments?.[0]?.paid_at;
+
+                  return (
+                    <Fragment key={o.order_number}>
+                      <tr
+                        onClick={() => toggleExpand(o.order_number)}
+                        className={`group cursor-pointer transition-colors ${isExpanded ? "bg-blue-50/60" : "hover:bg-gray-50/80"
+                          }`}
+                      >
+                        {/* Order Number */}
+                        <td className="px-4 py-3.5 text-xs font-bold text-[#1d68ff]">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpand(o.order_number);
+                            }}
+                            className="hover:underline flex items-center gap-1.5 cursor-pointer text-left"
+                          >
+                            <svg
+                              className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-90 text-[#1d68ff]" : "text-gray-400"}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span>{o.order_number}</span>
+                          </button>
+                        </td>
+
+                        {/* Customer */}
+                        <td className="px-4 py-3.5 text-xs">
+                          <p className={`font-semibold ${textCls}`}>{o.customer?.name || "Guest User"}</p>
+                          <p className="text-[11px] text-gray-400">{o.customer?.phone || o.customer?.email}</p>
+                        </td>
+
+                        {/* Date */}
+                        <td className="px-4 py-3.5 text-xs text-gray-500 whitespace-nowrap">
+                          {formatDate(o.created_at)}
+                        </td>
+
+                        {/* Total */}
+                        <td className={`px-4 py-3.5 text-xs font-bold whitespace-nowrap ${textCls}`}>
+                          {money(o.total)}
+                        </td>
+
+                        {/* Payment */}
+                        <td className="px-4 py-3.5 text-xs">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isPaid ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                              }`}
+                          >
+                            {o.payment_status_label || (isPaid ? "Paid" : "Unpaid")}
+                          </span>
+                        </td>
+
+                        {/* Status Badge */}
+                        <td className="px-4 py-3.5 text-xs">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-semibold capitalize ${getStatusBadge(
+                              o.status
+                            )}`}
+                          >
+                            {o.status_label || o.status.replace(/_/g, " ")}
+                          </span>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-4 py-3.5 text-xs whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpand(o.order_number)}
+                              className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${isExpanded
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                }`}
+                              title={isExpanded ? "Collapse Order Details" : "Expand Order Details"}
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d={isExpanded ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
+                              </svg>
+                              <span>{isExpanded ? "Hide Details" : "View Details"}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setStatusModalOrder(o);
+                                setNewStatus(
+                                  o.status === "pending" || o.status === "processing"
+                                    ? "out_for_delivery"
+                                    : "delivered"
+                                );
+                              }}
+                              className="px-2.5 py-1 text-[11px] font-semibold bg-blue-50 text-[#1d68ff] hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Update Status
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => printReceipt(o)}
+                              className="p-1 text-gray-500 hover:text-gray-800 cursor-pointer"
+                              title="Print Invoice"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* ── EXPANDED FULL ORDER & CUSTOMER DETAILS ROW (Directly Below Order) ── */}
+                      {isExpanded && (
+                        <tr className="bg-[#f8fafd] border-y-2 border-blue-200">
+                          <td colSpan={7} className="p-4 sm:p-6 space-y-4">
+                            {/* Header inside expansion */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-3">
+                              <div className="flex items-center gap-2">
+                                <span className="h-2.5 w-2.5 rounded-full bg-[#1d68ff]" />
+                                <span className="text-sm font-bold text-gray-900">
+                                  Full Order &amp; Customer Information: #{o.order_number}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setStatusModalOrder(o);
+                                    setNewStatus(
+                                      o.status === "pending" || o.status === "processing"
+                                        ? "out_for_delivery"
+                                        : "delivered"
+                                    );
+                                  }}
+                                  className="px-3 py-1.5 text-xs font-semibold bg-[#1d68ff] text-white rounded-lg hover:bg-[#1656d6] transition-colors cursor-pointer"
+                                >
+                                  Update Status
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => printReceipt(o)}
+                                  className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                                >
+                                  Print Receipt
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpand(o.order_number)}
+                                  className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer"
+                                  title="Close"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* 3 Information Cards Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {/* Customer Information Card */}
+                              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-2">
+                                <div className="flex items-center gap-2 text-xs font-bold text-gray-900 border-b border-gray-100 pb-2">
+                                  <svg className="w-4 h-4 text-[#1d68ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                  </svg>
+                                  <span>Customer Details</span>
+                                </div>
+                                <div className="text-xs space-y-1.5 text-gray-700">
+                                  <div>
+                                    <span className="text-gray-400 block text-[10px] uppercase font-bold">Full Name</span>
+                                    <span className="font-semibold text-gray-900 text-sm">{o.customer?.name || "Guest Customer"}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400 block text-[10px] uppercase font-bold">Email Address</span>
+                                    {o.customer?.email ? (
+                                      <a href={`mailto:${o.customer.email}`} className="text-[#1d68ff] hover:underline">
+                                        {o.customer.email}
+                                      </a>
+                                    ) : (
+                                      <span className="text-gray-400">Not provided</span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400 block text-[10px] uppercase font-bold">Phone Number</span>
+                                    {o.customer?.phone ? (
+                                      <a href={`tel:${o.customer.phone}`} className="text-gray-900 font-medium hover:text-[#1d68ff]">
+                                        {o.customer.phone}
+                                      </a>
+                                    ) : (
+                                      <span className="text-gray-400">Not provided</span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400 block text-[10px] uppercase font-bold">Account Type</span>
+                                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700">
+                                      {o.customer?.is_guest ? "Guest Checkout" : `Registered User (#${o.customer?.user_id ?? "N/A"})`}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Shipping & Delivery Card */}
+                              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-2">
+                                <div className="flex items-center gap-2 text-xs font-bold text-gray-900 border-b border-gray-100 pb-2">
+                                  <svg className="w-4 h-4 text-[#1d68ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  </svg>
+                                  <span>Shipping &amp; Delivery</span>
+                                </div>
+                                <div className="text-xs space-y-1.5 text-gray-700">
+                                  <div>
+                                    <span className="text-gray-400 block text-[10px] uppercase font-bold">Street Address</span>
+                                    <span className="font-medium text-gray-900">{o.shipping?.address || "Address not specified"}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400 block text-[10px] uppercase font-bold">City &amp; State</span>
+                                    <span className="font-medium text-gray-900">
+                                      {o.shipping?.city ? `${o.shipping.city}, ` : ""}
+                                      {o.shipping?.state || "Nigeria"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400 block text-[10px] uppercase font-bold">Delivery Status</span>
+                                    <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold capitalize ${getStatusBadge(o.status)}`}>
+                                      {o.status_label || o.status.replace(/_/g, " ")}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Payment & Financial Card */}
+                              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-2">
+                                <div className="flex items-center gap-2 text-xs font-bold text-gray-900 border-b border-gray-100 pb-2">
+                                  <svg className="w-4 h-4 text-[#1d68ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                  </svg>
+                                  <span>Payment &amp; Totals</span>
+                                </div>
+                                <div className="text-xs space-y-1.5 text-gray-700">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-500">Payment Status:</span>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${isPaid ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                                      {o.payment_status_label || (isPaid ? "Paid" : "Unpaid")}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-500">Subtotal:</span>
+                                    <span className="font-semibold text-gray-800">{money(o.subtotal)}</span>
+                                  </div>
+                                  {parseFloat(o.referral_discount || "0") > 0 && (
+                                    <div className="flex justify-between items-center text-red-600">
+                                      <span>Referral Discount:</span>
+                                      <span>-{money(o.referral_discount)}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between items-center pt-1 border-t border-gray-100 font-bold text-sm text-gray-900">
+                                    <span>Total Amount:</span>
+                                    <span className="text-[#1d68ff]">{money(o.total)}</span>
+                                  </div>
+                                  {paymentRef !== "N/A" && (
+                                    <div className="pt-1 text-[11px] text-gray-400">
+                                      Ref: <span className="font-mono text-gray-600">{paymentRef}</span>
+                                    </div>
+                                  )}
+                                  {paidAtTime && (
+                                    <div className="text-[10px] text-gray-400">
+                                      Paid at: {formatDate(paidAtTime)}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Order Items Table inside expansion */}
+                            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-2xs">
+                              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-800">
+                                Purchased Items ({o.items?.length || 0})
+                              </div>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs border-collapse">
+                                  <thead className="bg-gray-50/50 text-gray-500 font-medium border-b border-gray-100">
+                                    <tr>
+                                      <th className="px-4 py-2">Item</th>
+                                      <th className="px-4 py-2">Product ID</th>
+                                      <th className="px-4 py-2">Unit Price</th>
+                                      <th className="px-4 py-2">Quantity</th>
+                                      <th className="px-4 py-2 text-right">Line Total</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100">
+                                    {o.items?.map((it, idx) => (
+                                      <tr key={`${it.product_id}-${idx}`} className="hover:bg-gray-50/50">
+                                        <td className="px-4 py-3">
+                                          <div className="flex items-center gap-3">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                              src={it.product_image || "/placeholder.png"}
+                                              alt={it.product_name}
+                                              className="w-10 h-10 object-cover rounded-lg border bg-gray-50 shrink-0"
+                                              onError={(e) => {
+                                                (e.target as HTMLImageElement).src = "/placeholder.png";
+                                              }}
+                                            />
+                                            <span className="font-semibold text-gray-900">{it.product_name}</span>
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-500 font-mono text-[11px]">
+                                          #{it.product_id}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-700">
+                                          {money(it.unit_price)}
+                                        </td>
+                                        <td className="px-4 py-3 font-semibold text-gray-900">
+                                          &times; {it.quantity}
+                                        </td>
+                                        <td className="px-4 py-3 font-bold text-right text-gray-900">
+                                          {money(it.line_total)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {!loading && !error && totalCount > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600">
+            <p>
+              Page <span className="font-semibold text-[#1d68ff]">{page}</span> of {totalPages} &bull;{" "}
+              {totalCount} total order{totalCount !== 1 ? "s" : ""}
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={!hasPrev}
+                className="rounded-md border border-[#E8E8E8] p-1.5 hover:bg-gray-50 disabled:opacity-40 cursor-pointer"
+              >
+                &larr; Prev
+              </button>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasNext}
+                className="rounded-md border border-[#E8E8E8] p-1.5 hover:bg-gray-50 disabled:opacity-40 cursor-pointer"
+              >
+                Next &rarr;
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }

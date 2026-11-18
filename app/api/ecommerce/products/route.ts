@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("q");
+    const noCache = searchParams.has("_t") || searchParams.has("nocache");
 
     let endpoint: string;
     if (query && query.trim()) {
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
 
     const backendRes = await apiClient<PaginatedData<BackendProduct>>(endpoint, {
       method: "GET",
-      next: { revalidate: 60 }, // Cache with 60s ISR revalidation for performance
+      ...(noCache ? { cache: "no-store" } : { next: { revalidate: 60 } }),
     });
 
     return NextResponse.json(

@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useCart } from "@/lib/context/CartContext";
 
 export default function Navbar() {
   const { totalCount } = useCart();
   const router = useRouter();
+  const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
@@ -246,30 +247,32 @@ export default function Navbar() {
             {/* Nav links */}
             <nav className="hidden lg:flex items-center gap-6 xl:gap-8 text-sm font-semibold">
               {[
-                { label: "Home", href: "/", active: true },
+                { label: "Home", href: "/" },
                 { label: "Products", href: "/products" },
-                { label: "Pharmacy", href: "#pharmacy", badge: "New" },
-                { label: "About Us", href: "#about" },
-                { label: "Blogs", href: "#blogs" },
-                { label: "Contact", href: "#contact" },
-              ].map(({ label, href, active, badge }) => (
-                <Link
-                  key={label}
-                  href={href}
-                  className={`flex items-center gap-1.5 transition-all pb-0.5 border-b-2 ${
-                    active
-                      ? "text-white border-white"
-                      : "text-white/80 hover:text-white border-transparent hover:border-white/50"
-                  }`}
-                >
-                  {label}
-                  {badge && (
-                    <span className="text-[9px] bg-white text-[#0265CB] px-1.5 py-0.5 rounded-full font-black leading-none">
-                      {badge}
-                    </span>
-                  )}
-                </Link>
-              ))}
+                { label: "Pharmacy", href: "/pharmacy", badge: "New" },
+                { label: "About Us", href: "/about" },
+                { label: "Contact", href: "/contact" },
+              ].map(({ label, href, badge }) => {
+                const active = href === "/" ? pathname === "/" : pathname?.startsWith(href);
+                return (
+                  <Link
+                    key={label}
+                    href={href}
+                    className={`flex items-center gap-1.5 transition-all pb-0.5 border-b-2 ${
+                      active
+                        ? "text-white border-white"
+                        : "text-white/80 hover:text-white border-transparent hover:border-white/50"
+                    }`}
+                  >
+                    {label}
+                    {badge && (
+                      <span className="text-[9px] bg-white text-[#0265CB] px-1.5 py-0.5 rounded-full font-black leading-none">
+                        {badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
             </nav>
 
             {/* Right: contact + recently viewed */}

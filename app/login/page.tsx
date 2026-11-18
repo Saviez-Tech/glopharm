@@ -66,8 +66,9 @@ function LoginForm() {
         throw new Error(data.message || "Invalid email or password.");
       }
 
-      // Perform a full navigation so new cookies are sent with request headers
-      window.location.assign(callbackUrl);
+      // Staff users go to the admin dashboard; everyone else follows callbackUrl
+      const isStaff = data?.data?.is_staff === true;
+      window.location.assign(isStaff ? "/glopharm" : callbackUrl);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to sign in. Please try again.";
       setError(msg);
@@ -246,7 +247,7 @@ function LoginForm() {
 
         {/* Footer info */}
         <div className="pt-6 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-400 gap-2">
-          <span>&copy; {new Date().getFullYear()} GloPharm Ltd. All rights reserved.</span>
+          <span>&copy; 2026 GloPharm Ltd. All rights reserved.</span>
           <div className="flex items-center gap-4">
             <Link href="/" className="hover:text-neutral-700 transition-colors">Privacy</Link>
             <Link href="/" className="hover:text-neutral-700 transition-colors">Terms</Link>

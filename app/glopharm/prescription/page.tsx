@@ -1,727 +1,1432 @@
 "use client";
 
-import { Suspense } from "react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useAdmin } from "../layout";
 
 /* -------------------------------------------------------------------------- */
-/*  Types — same shape as the customer-side TestItem, plus patient info and    */
-/*  an optional fileUrl for previewing the uploaded report.                    */
+/*  Types matching backend API responses                                      */
 /* -------------------------------------------------------------------------- */
 
-type LabStatus = "reviewing" | "ready" | "completed";
+interface LabTestStats {
+  awaiting_review: number;
+  awaiting_payment: {
+    count: number;
+    pending_amount: string;
+  };
+  dispensed: number;
+  total_reports: number;
+}
 
-interface PrescribedDrug {
+interface LabTestFile {
+  id?: number;
+  file_url: string;
+  original_name: string;
+  uploaded_at?: string;
+}
+
+interface PrescriptionItem {
+  id?: number;
+  product_id: number;
+  name: string;
+  dosage_instructions: string;
+  quantity: number;
+  unit_price: string | number;
+  line_total: string | number;
+  image?: string;
+}
+
+interface PrescriptionData {
+  doctor_name: string;
+  doctor_note: string;
+  issued_at?: string;
+  items: PrescriptionItem[];
+  total?: number | string;
+  order?: {
+    order_number: string;
+    status: string;
+    payment_status: string;
+  } | null;
+}
+
+interface LabTestItem {
+  reference: string;
+  test_name: string;
+  patient: {
+    id: number;
     name: string;
-    dosage: string;
-    quantity: number;
-    price: number;
-    image: string;
+    initials: string;
+    email: string;
+    phone?: string;
+  };
+  created_at: string;
+  file?: LabTestFile | null;
+  status: string;
+  status_label: string;
+  action: string;
+  action_label: string;
 }
 
-interface LabSubmission {
-    id: string;
-    title: string;
-    date: string;
-    fileName: string;
-    /** URL of the uploaded report (image or PDF). Without it a placeholder is shown. */
-    fileUrl?: string;
-    status: LabStatus;
-    patient: { name: string; email: string; phone: string; age?: number; gender?: string };
-    patientNotes?: string;
-    doctor?: { name: string; role: string; notes: string };
-    drugs?: PrescribedDrug[];
-    totalCost?: number;
+interface LabTestDetail extends LabTestItem {
+  symptoms?: string;
+  reviewed_at?: string | null;
+  files?: LabTestFile[];
+  prescription?: PrescriptionData | null;
 }
 
-/* ------------------------------ Sample data ------------------------------ */
+interface CatalogProduct {
+  id: number;
+  name: string;
+  price: string | number;
+  image: string;
+  category?: string;
+}
+
+/* -------------------------------- Constants ------------------------------- */
 
 const DOCTORS = [
-    { name: "Dr. Emmanuel Adeyemi", role: "Lead Clinical Pharmacologist" },
-    { name: "Dr. Chioma Nwosu", role: "Consultant Physician" },
+  { name: "Dr. Emmanuel Adeyemi", role: "Lead Clinical Pharmacologist" },
+  { name: "Dr. Chioma Nwosu", role: "Consultant Physician" },
+  { name: "Dr. menduzer", role: "Resident Physician" },
 ];
 
-const IMG_A = "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=200&auto=format&fit=crop&q=80";
-const IMG_B = "https://images.unsplash.com/photo-1577401239170-897942555fb3?w=200&auto=format&fit=crop&q=80";
-const IMG_C = "https://images.unsplash.com/photo-1550831107-1553da8c8464?w=200&auto=format&fit=crop&q=80";
-const IMG_D = "https://images.unsplash.com/photo-1584744982491-665216d95f8b?w=200&auto=format&fit=crop&q=80";
-
-/** Medicines the admin can add to a prescription. Replace with your product API. */
-const CATALOG: { name: string; price: number; image: string; dosage: string }[] = [
-    { name: "Artemether / Lumefantrine 80/480mg (ACT)", price: 4800, image: IMG_A, dosage: "1 tablet twice daily for 3 days with a meal" },
-    { name: "Vitamin C 1000mg Effervescent (30 tabs)", price: 4500, image: IMG_A, dosage: "1 tablet dissolved in water daily" },
-    { name: "Paracetamol Extra Relief (20 tabs)", price: 1500, image: IMG_B, dosage: "2 tablets as needed for fever/headache" },
-    { name: "Multivitamin Daily Formula (30 caps)", price: 8500, image: IMG_B, dosage: "1 capsule daily after breakfast" },
-    { name: "Cod Liver Oil Omega-3 (90 caps)", price: 9800, image: IMG_B, dosage: "1 capsule twice daily with meals" },
-    { name: "Zinc & Vitamin D3 Combo (60 tabs)", price: 6200, image: IMG_C, dosage: "1 tablet daily with food" },
-    { name: "Probiotics Daily (30 capsules)", price: 11500, image: IMG_C, dosage: "1 capsule daily" },
-    { name: "Antiseptic Disinfectant Liquid (500ml)", price: 2800, image: IMG_D, dosage: "Apply as directed to the affected area" },
-];
-
-const SEED: LabSubmission[] = [
-    {
-        id: "LAB-044",
-        title: "Urinalysis & Kidney Function",
-        date: "Today, 11:05 AM",
-        fileName: "urinalysis_kft.pdf",
-        status: "reviewing",
-        patient: { name: "Ngozi Eze", email: "ngozi.eze@example.com", phone: "+234 803 555 0192", age: 41, gender: "Female" },
-        patientNotes: "Burning sensation when urinating for 3 days, lower back pain.",
-    },
-    {
-        id: "LAB-043",
-        title: "Full Blood Count (FBC)",
-        date: "Today, 10:40 AM",
-        fileName: "fbc_report.png",
-        status: "reviewing",
-        patient: { name: "Tunde Bakare", email: "tunde.b@example.com", phone: "+234 802 555 0147", age: 29, gender: "Male" },
-        patientNotes: "Feeling tired often, occasional dizziness.",
-    },
-    {
-        id: "LAB-041",
-        title: "Malaria & Typhoid Panel",
-        date: "Today, 09:30 AM",
-        fileName: "malaria_lab_scan.pdf",
-        status: "ready",
-        patient: { name: "Adaeze Okafor", email: "adaeze.o@example.com", phone: "+234 806 555 0118", age: 34, gender: "Female" },
-        patientNotes: "Fever and headache for 2 days, body aches.",
-        doctor: {
-            name: "Dr. Emmanuel Adeyemi",
-            role: "Lead Clinical Pharmacologist",
-            notes:
-                "Moderate Plasmodium falciparum (+2) detected. Artemisinin-based therapy (ACT), immune support, and analgesic prescribed for 3 days.",
-        },
-        drugs: [
-            { name: "Artemether / Lumefantrine 80/480mg (ACT)", dosage: "1 tablet twice daily for 3 days with a meal", quantity: 1, price: 4800, image: IMG_A },
-            { name: "Vitamin C 1000mg Effervescent (30 tabs)", dosage: "1 tablet dissolved in water daily", quantity: 1, price: 4500, image: IMG_A },
-            { name: "Paracetamol Extra Relief (20 tabs)", dosage: "2 tablets as needed for fever/headache", quantity: 1, price: 1500, image: IMG_B },
-        ],
-        totalCost: 10800,
-    },
-    {
-        id: "LAB-039",
-        title: "Fasting Blood Glucose & Lipid Panel",
-        date: "Today, 10:15 AM",
-        fileName: "lipid_glucose_nov.pdf",
-        status: "reviewing",
-        patient: { name: "Ibrahim Musa", email: "ibrahim.m@example.com", phone: "+234 809 555 0163", age: 52, gender: "Male" },
-        patientNotes: "Routine check. Family history of diabetes.",
-    },
-    {
-        id: "LAB-022",
-        title: "Comprehensive Wellness Blood Panel",
-        date: "Oct 18, 2026",
-        fileName: "wellness_scan.pdf",
-        status: "completed",
-        patient: { name: "Folake Adebayo", email: "folake.a@example.com", phone: "+234 805 555 0175", age: 37, gender: "Female" },
-        doctor: {
-            name: "Dr. Emmanuel Adeyemi",
-            role: "Lead Clinical Pharmacologist",
-            notes: "Prescription completed and delivered to the patient's Victoria Island address.",
-        },
-        drugs: [{ name: "Multivitamin Daily Formula (30 caps)", dosage: "1 capsule daily after breakfast", quantity: 1, price: 8500, image: IMG_B }],
-        totalCost: 8500,
-    },
+const DEFAULT_DRUGS: CatalogProduct[] = [
+  { id: 1, name: "Paracetamol 500mg Tablets", price: 2000, image: "https://res.cloudinary.com/dpuvtcctg/image/upload/v1761670426/cld-sample-5.jpg", category: "Analgesic" },
+  { id: 2, name: "Artemether / Lumefantrine 80/480mg (ACT)", price: 4800, image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=200&auto=format&fit=crop&q=80", category: "Antimalarial" },
+  { id: 3, name: "Vitamin C 1000mg Effervescent (30 tabs)", price: 4500, image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=200&auto=format&fit=crop&q=80", category: "Supplements" },
+  { id: 4, name: "Amoxicillin / Clavulanic Acid 625mg (Augmentin)", price: 6500, image: "https://images.unsplash.com/photo-1550831107-1553da8c8464?w=200&auto=format&fit=crop&q=80", category: "Antibiotics" },
+  { id: 5, name: "Ciprofloxacin 500mg Tablets", price: 3500, image: "https://images.unsplash.com/photo-1584744982491-665216d95f8b?w=200&auto=format&fit=crop&q=80", category: "Antibiotics" },
+  { id: 6, name: "Ibuprofen 400mg Tablets", price: 1800, image: "https://images.unsplash.com/photo-1577401239170-897942555fb3?w=200&auto=format&fit=crop&q=80", category: "Pain Relief" },
+  { id: 7, name: "Multivitamin Daily Formula (30 caps)", price: 8500, image: "https://images.unsplash.com/photo-1577401239170-897942555fb3?w=200&auto=format&fit=crop&q=80", category: "Vitamins" },
+  { id: 8, name: "Metronidazole 400mg Tablets (Flagyl)", price: 2200, image: "https://images.unsplash.com/photo-1550831107-1553da8c8464?w=200&auto=format&fit=crop&q=80", category: "Antiprotozoal" },
 ];
 
 const TABS = [
-    { key: "all", label: "All Tests" },
-    { key: "reviewing", label: "Awaiting Review" },
-    { key: "ready", label: "Prescribed" },
-    { key: "completed", label: "Completed" },
+  { key: "all", label: "All Tests" },
+  { key: "under_review", label: "Awaiting Review" },
+  { key: "awaiting_payment", label: "Awaiting Payment" },
+  { key: "completed", label: "Completed" },
 ] as const;
+
 type TabKey = (typeof TABS)[number]["key"];
 
-const STATUS_LABEL: Record<LabStatus, string> = {
-    reviewing: "Awaiting Review",
-    ready: "Prescribed",
-    completed: "Completed",
-};
-const STATUS_STYLE: Record<LabStatus, string> = {
-    reviewing: "bg-yellow-100 text-yellow-700",
-    ready: "bg-blue-100 text-blue-700",
-    completed: "bg-green-200 text-green-800",
+const naira = (val: string | number | undefined) => {
+  const n = typeof val === "number" ? val : parseFloat(String(val || "0"));
+  return (
+    "₦" +
+    new Intl.NumberFormat("en-NG", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(isNaN(n) ? 0 : n)
+  );
 };
 
-const naira = (n: number) => "₦" + n.toLocaleString("en-NG");
-const initials = (name: string) =>
-    name
-        .split(" ")
-        .map((p) => p[0])
-        .slice(0, 2)
-        .join("")
-        .toUpperCase();
+const formatDate = (isoStr: string) => {
+  if (!isoStr) return "";
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return isoStr;
+  }
+};
+
+const initials = (name: string, fallback = "ME") => {
+  if (!name) return fallback;
+  const parts = name.split(/[\s@.]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+};
 
 /* --------------------------------- Icons ---------------------------------- */
 
 const Svg = ({ children, className = "h-4 w-4" }: { children: ReactNode; className?: string }) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
-        {children}
-    </svg>
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.8}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden
+  >
+    {children}
+  </svg>
 );
-const SearchIcon = () => (<Svg><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></Svg>);
-const CloseIcon = () => (<Svg><path d="M6 6l12 12M18 6 6 18" /></Svg>);
-const FileIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
-    <Svg className={className}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" /><path d="M14 3v5h5M9 13h6M9 17h4" /></Svg>
-);
-const TrashIcon = () => (<Svg><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14" /></Svg>);
-const CheckIcon = () => (<Svg><path d="m5 12.5 4.5 4.5L19 7.5" /></Svg>);
-const CaretRight = () => (<svg viewBox="0 0 8 10" className="h-2.5 w-2 fill-current" aria-hidden><path d="M0 0l8 5-8 5z" /></svg>);
 
-const Badge = ({ status }: { status: LabStatus }) => (
-    <span className={`inline-block whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-medium ${STATUS_STYLE[status]}`}>
-        {STATUS_LABEL[status]}
-    </span>
+const SearchIcon = () => (
+  <Svg>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </Svg>
 );
+
+const CloseIcon = () => (
+  <Svg>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </Svg>
+);
+
+const FileIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+  <Svg className={className}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" />
+    <path d="M14 3v5h5M9 13h6M9 17h4" />
+  </Svg>
+);
+
+const TrashIcon = () => (
+  <Svg>
+    <path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14" />
+  </Svg>
+);
+
+const CheckIcon = () => (
+  <Svg>
+    <path d="m5 12.5 4.5 4.5L19 7.5" />
+  </Svg>
+);
+
+const CaretRight = () => (
+  <svg viewBox="0 0 8 10" className="h-2.5 w-2 fill-current" aria-hidden>
+    <path d="M0 0l8 5-8 5z" />
+  </svg>
+);
+
+const Badge = ({ status, label }: { status: string; label?: string }) => {
+  const norm = status?.toLowerCase() || "";
+  let style = "bg-gray-100 text-gray-700";
+  let display = label || status;
+
+  if (norm.includes("review")) {
+    style = "bg-yellow-100 text-yellow-800 border border-yellow-200";
+    display = display || "Awaiting Review";
+  } else if (norm.includes("payment") || norm === "ready") {
+    style = "bg-blue-100 text-blue-800 border border-blue-200";
+    display = display || "Awaiting Payment";
+  } else if (norm.includes("complete") || norm.includes("dispens") || norm === "delivered") {
+    style = "bg-green-100 text-green-800 border border-green-200";
+    display = display || "Completed";
+  }
+
+  return (
+    <span className={`inline-block whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-semibold ${style}`}>
+      {display}
+    </span>
+  );
+};
 
 const INPUT =
-    "w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-50 disabled:text-gray-500";
+  "w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-50 disabled:text-gray-500";
 
 /* -------------------------------------------------------------------------- */
-/*  Review drawer — read the report, then prescribe                            */
+/*  Report Preview Component                                                  */
 /* -------------------------------------------------------------------------- */
 
-function ReportPreview({ item }: { item: LabSubmission }) {
-    const src = item.fileUrl;
-    const isPdf = /\.pdf($|\?)/i.test(src ?? item.fileName);
-    const isImage = /\.(png|jpe?g|webp|gif|svg)($|\?)/i.test(src ?? item.fileName);
-
+function ReportPreview({ file }: { file?: LabTestFile | null }) {
+  if (!file || !file.file_url) {
     return (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
-            {src && isImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={src} alt={item.fileName} className="max-h-96 w-full bg-white object-contain" />
-            ) : src && isPdf ? (
-                <iframe src={src} title={item.fileName} className="h-96 w-full bg-white" />
-            ) : (
-                <div className="flex h-44 flex-col items-center justify-center gap-2 px-4 text-center text-xs text-gray-500">
-                    <FileIcon className="h-9 w-9 text-gray-400" />
-                    <p className="font-semibold text-gray-700">{item.fileName}</p>
-                    <p>
-                        Preview unavailable — set <code className="rounded bg-gray-200 px-1">fileUrl</code> on the submission to show the report here.
-                    </p>
-                </div>
-            )}
-
-            <div className="flex items-center justify-between gap-3 border-t border-gray-200 bg-white px-4 py-2.5 text-xs">
-                <span className="flex min-w-0 items-center gap-2 text-gray-600">
-                    <FileIcon className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{item.fileName}</span>
-                </span>
-                {src && (
-                    <span className="flex shrink-0 items-center gap-3 font-semibold text-blue-600">
-                        <a href={src} target="_blank" rel="noreferrer" className="hover:underline">Open</a>
-                        <a href={src} download={item.fileName} className="hover:underline">Download</a>
-                    </span>
-                )}
-            </div>
-        </div>
+      <div className="flex h-36 flex-col items-center justify-center rounded-xl border border-gray-200 bg-gray-50 p-4 text-center text-xs text-gray-500">
+        <FileIcon className="h-8 w-8 text-gray-400 mb-1" />
+        <p className="font-medium text-gray-700">No document attached</p>
+      </div>
     );
+  }
+
+  const src = file.file_url;
+  const fileName = file.original_name || "lab_report.pdf";
+  const isPdf = /\.pdf($|\?)/i.test(src) || /\.pdf$/i.test(fileName);
+  const isImage = /\.(png|jpe?g|webp|gif|svg)($|\?)/i.test(src) || /\.(png|jpe?g|webp|gif|svg)$/i.test(fileName);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+      {isImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={fileName} className="max-h-96 w-full bg-white object-contain" />
+      ) : isPdf ? (
+        <iframe src={src} title={fileName} className="h-96 w-full bg-white" />
+      ) : (
+        <div className="flex h-40 flex-col items-center justify-center gap-2 px-4 text-center text-xs text-gray-500">
+          <FileIcon className="h-9 w-9 text-gray-400" />
+          <p className="font-semibold text-gray-700">{fileName}</p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-3 border-t border-gray-200 bg-white px-4 py-2.5 text-xs">
+        <span className="flex min-w-0 items-center gap-2 text-gray-600">
+          <FileIcon className="h-4 w-4 shrink-0 text-blue-600" />
+          <span className="truncate font-medium">{fileName}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-3 font-semibold text-blue-600">
+          <a href={src} target="_blank" rel="noreferrer" className="hover:underline">
+            View Full
+          </a>
+          <a href={src} download={fileName} target="_blank" rel="noreferrer" className="hover:underline">
+            Download
+          </a>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Review Drawer (View detail, symptoms, and Prescribe)                     */
+/* -------------------------------------------------------------------------- */
+
+interface PrescribeFormItem {
+  product_id: number;
+  name: string;
+  dosage_instructions: string;
+  quantity: number;
+  unit_price: number;
+  image?: string;
 }
 
 function ReviewDrawer({
-    item,
-    onClose,
-    onSave,
-    onComplete,
+  reference,
+  onClose,
+  onPrescriptionSuccess,
 }: {
-    item: LabSubmission;
-    onClose: () => void;
-    onSave: (updated: LabSubmission) => void;
-    onComplete: (updated: LabSubmission) => void;
+  reference: string;
+  onClose: () => void;
+  onPrescriptionSuccess: () => void;
 }) {
-    const readOnly = item.status === "completed";
+  const [detail, setDetail] = useState<LabTestDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-    const [doctorName, setDoctorName] = useState(item.doctor?.name ?? DOCTORS[0].name);
-    const [notes, setNotes] = useState(item.status === "reviewing" ? "" : item.doctor?.notes ?? "");
-    const [drugs, setDrugs] = useState<PrescribedDrug[]>(item.drugs ?? []);
-    const [medQuery, setMedQuery] = useState("");
-    const [pickerOpen, setPickerOpen] = useState(false);
-    const [error, setError] = useState("");
+  // Close on escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
-    useEffect(() => {
-        const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [onClose]);
+  // Prescribe form states
+  const [doctorName, setDoctorName] = useState(DOCTORS[0].name);
+  const [customDoctor, setCustomDoctor] = useState("");
+  const [notes, setNotes] = useState("");
+  const [prescribedItems, setPrescribedItems] = useState<PrescribeFormItem[]>([]);
 
-    const total = drugs.reduce((s, d) => s + d.price * d.quantity, 0);
+  // Fetch full details of the lab test
+  const fetchDetail = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/gload/lab-tests/${reference}/`);
+      if (res.status === 401) {
+        window.location.href = "/glopharm/login?session_expired=1";
+        return;
+      }
+      const json = await res.json();
+      if (json?.data) {
+        const d: LabTestDetail = json.data;
+        setDetail(d);
 
-    const results = CATALOG.filter(
-        (c) => !drugs.some((d) => d.name === c.name) && c.name.toLowerCase().includes(medQuery.trim().toLowerCase())
-    ).slice(0, 6);
-
-    const addDrug = (c: (typeof CATALOG)[number]) => {
-        setDrugs((prev) => [...prev, { name: c.name, dosage: c.dosage, quantity: 1, price: c.price, image: c.image }]);
-        setMedQuery("");
-        setError("");
-    };
-    const patchDrug = (i: number, patch: Partial<PrescribedDrug>) =>
-        setDrugs((prev) => prev.map((d, idx) => (idx === i ? { ...d, ...patch } : d)));
-    const removeDrug = (i: number) => setDrugs((prev) => prev.filter((_, idx) => idx !== i));
-
-    const build = (): LabSubmission | null => {
-        if (!notes.trim()) return setError("Write the doctor's notes for the patient."), null;
-        if (drugs.length === 0) return setError("Add at least one medicine to the prescription."), null;
-        if (drugs.some((d) => !d.dosage.trim())) return setError("Every medicine needs dosage instructions."), null;
-
-        const doc = DOCTORS.find((d) => d.name === doctorName) ?? DOCTORS[0];
-        return {
-            ...item,
-            status: "ready",
-            doctor: { name: doc.name, role: doc.role, notes: notes.trim() },
-            drugs,
-            totalCost: total,
-        };
-    };
-
-    const send = () => {
-        const updated = build();
-        if (updated) onSave(updated);
-    };
-
-    const dispense = () => {
-        const updated = build();
-        if (!updated) return;
-        if (window.confirm("Mark this prescription as paid, dispensed and delivered?")) {
-            onComplete({ ...updated, status: "completed" });
+        // Prepopulate if prescription already exists
+        if (d.prescription) {
+          setDoctorName(d.prescription.doctor_name || DOCTORS[0].name);
+          setNotes(d.prescription.doctor_note || "");
+          if (Array.isArray(d.prescription.items)) {
+            setPrescribedItems(
+              d.prescription.items.map((it) => ({
+                product_id: it.product_id,
+                name: it.name,
+                dosage_instructions: it.dosage_instructions || "",
+                quantity: it.quantity || 1,
+                unit_price: Number(it.unit_price) || 0,
+                image: it.image,
+              }))
+            );
+          }
         }
-    };
+      } else {
+        setError(json?.message || "Failed to load lab test details");
+      }
+    } catch {
+      setError("Failed to connect to lab test service");
+    } finally {
+      setLoading(false);
+    }
+  }, [reference]);
 
-    return (
-        <div className="fixed inset-0 z-50 flex justify-end">
-            <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+  useEffect(() => {
+    fetchDetail();
+  }, [fetchDetail]);
 
-            <aside role="dialog" aria-modal="true" aria-label={`Lab test ${item.id}`} className="relative flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3 border-b border-gray-200 px-5 py-4">
-                    <div className="min-w-0">
-                        <p className="text-[11px] font-medium text-gray-500">
-                            #{item.id} · {item.date}
-                        </p>
-                        <h2 className="mt-0.5 truncate text-lg font-semibold text-gray-900">{item.title}</h2>
-                        <div className="mt-1.5"><Badge status={item.status} /></div>
-                    </div>
-                    <button onClick={onClose} aria-label="Close" className="rounded-md border border-gray-300 p-1.5 text-gray-600 hover:bg-gray-50">
-                        <CloseIcon />
-                    </button>
-                </div>
+  // Drug Catalog & Search
+  const [catalog, setCatalog] = useState<CatalogProduct[]>(DEFAULT_DRUGS);
+  const [medQuery, setMedQuery] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [searchingMed, setSearchingMed] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
 
-                {/* Body */}
-                <div className="flex-1 space-y-6 overflow-y-auto p-5">
-                    {/* Patient */}
-                    <section>
-                        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Patient</h3>
-                        <div className="flex items-center gap-3 rounded-xl border border-gray-200 p-3">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
-                                {initials(item.patient.name)}
-                            </span>
-                            <div className="min-w-0 text-xs">
-                                <p className="text-sm font-semibold text-gray-900">{item.patient.name}</p>
-                                <p className="truncate text-gray-500">
-                                    {[item.patient.gender, item.patient.age ? `${item.patient.age} yrs` : null].filter(Boolean).join(" · ")}
-                                </p>
-                                <p className="truncate text-gray-500">
-                                    {item.patient.email} · {item.patient.phone}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="mt-3 rounded-xl bg-gray-50 p-3 text-xs text-gray-700">
-                            <p className="mb-1 font-semibold text-gray-800">Symptoms / notes from patient</p>
-                            <p className="italic">{item.patientNotes?.trim() || "No notes provided."}</p>
-                        </div>
-                    </section>
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-                    {/* Report */}
-                    <section>
-                        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Lab report</h3>
-                        <ReportPreview item={item} />
-                    </section>
+  // Fetch product catalog for prescribing medicines
+  const loadDrugs = useCallback(async (query = "") => {
+    setSearchingMed(true);
+    try {
+      const q = query.trim();
+      let found: CatalogProduct[] = [];
 
-                    {/* Prescription */}
-                    <section className="space-y-4">
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            {readOnly ? "Prescription (dispensed)" : "Prescription"}
-                        </h3>
+      // 1. Try ecommerce products endpoint with ?q=
+      try {
+        const url = q
+          ? `/api/ecommerce/products?q=${encodeURIComponent(q)}`
+          : "/api/ecommerce/products?page=1&page_size=50";
+        const res = await fetch(url);
+        if (res.ok) {
+          const json = await res.json();
+          const results = json?.data?.results || (Array.isArray(json?.data) ? json.data : []);
+          if (Array.isArray(results) && results.length > 0) {
+            found = results.map((p: { id: number; name: string; price?: string | number; original_price?: string | number; image?: string; category?: string }) => ({
+              id: p.id,
+              name: p.name,
+              price: Number(p.price) || Number(p.original_price) || 0,
+              image: p.image || "",
+              category: p.category || "",
+            }));
+          }
+        }
+      } catch {
+        // ignore and fallback
+      }
 
-                        <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-900">Prescribing doctor</label>
-                            <select value={doctorName} onChange={(e) => setDoctorName(e.target.value)} disabled={readOnly} className={INPUT}>
-                                {DOCTORS.map((d) => (
-                                    <option key={d.name} value={d.name}>
-                                        {d.name} — {d.role}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+      // 2. Try admin manage products endpoint if still empty
+      if (found.length === 0) {
+        try {
+          const url = q
+            ? `/api/gload/products?search=${encodeURIComponent(q)}`
+            : "/api/gload/products?page=1";
+          const res = await fetch(url);
+          if (res.ok) {
+            const json = await res.json();
+            const results = json?.data?.results || (Array.isArray(json?.data) ? json.data : []);
+            if (Array.isArray(results) && results.length > 0) {
+              found = results.map((p: { id: number; name: string; price?: string | number; image?: string; category?: string }) => ({
+                id: p.id,
+                name: p.name,
+                price: Number(p.price) || 0,
+                image: p.image || "",
+                category: p.category || "",
+              }));
+            }
+          }
+        } catch {
+          // ignore and fallback
+        }
+      }
 
-                        <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-900">Doctor&apos;s notes (shown to the patient)</label>
-                            <textarea
-                                rows={3}
-                                value={notes}
-                                disabled={readOnly}
-                                onChange={(e) => {
-                                    setNotes(e.target.value);
-                                    setError("");
-                                }}
-                                placeholder="e.g. Moderate Plasmodium falciparum (+2) detected. ACT, immune support and analgesic prescribed for 3 days."
-                                className={`${INPUT} resize-none`}
-                            />
-                        </div>
+      setCatalog((prev) => {
+        const map = new Map<number, CatalogProduct>();
+        found.forEach((item) => map.set(item.id, item));
+        DEFAULT_DRUGS.forEach((item) => {
+          if (!map.has(item.id)) map.set(item.id, item);
+        });
+        prev.forEach((item) => {
+          if (!map.has(item.id)) map.set(item.id, item);
+        });
+        return Array.from(map.values());
+      });
+    } finally {
+      setSearchingMed(false);
+    }
+  }, []);
 
-                        {/* Medicines */}
-                        <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-900">Medicines</label>
+  // Initial load
+  useEffect(() => {
+    loadDrugs();
+  }, [loadDrugs]);
 
-                            {!readOnly && (
-                                <div className="relative">
-                                    <input
-                                        value={medQuery}
-                                        onChange={(e) => setMedQuery(e.target.value)}
-                                        onFocus={() => setPickerOpen(true)}
-                                        onBlur={() => setPickerOpen(false)}
-                                        placeholder="Search medicine to add…"
-                                        className={`${INPUT} pr-10`}
-                                    />
-                                    <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500">
-                                        <SearchIcon />
-                                    </span>
+  // Debounced search when medQuery changes
+  useEffect(() => {
+    if (!medQuery.trim()) return;
+    const timer = setTimeout(() => {
+      loadDrugs(medQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [medQuery, loadDrugs]);
 
-                                    {pickerOpen && (
-                                        <ul
-                                            onMouseDown={(e) => e.preventDefault()}
-                                            className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg"
-                                        >
-                                            {results.length === 0 && <li className="px-3 py-3 text-xs text-gray-500">No matching medicines.</li>}
-                                            {results.map((c) => (
-                                                <li key={c.name}>
-                                                    <button type="button" onClick={() => addDrug(c)} className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-gray-50">
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img src={c.image} alt="" className="h-8 w-8 shrink-0 rounded-md border border-gray-200 object-cover" />
-                                                        <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-800">{c.name}</span>
-                                                        <span className="shrink-0 text-xs font-semibold text-gray-700">{naira(c.price)}</span>
-                                                    </button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
-                            )}
+  const totalCalculated = prescribedItems.reduce(
+    (sum, it) => sum + (Number(it.unit_price) || 0) * (it.quantity || 1),
+    0
+  );
 
-                            <ul className="mt-3 space-y-2.5">
-                                {drugs.length === 0 && (
-                                    <li className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-center text-xs text-gray-500">
-                                        No medicines added yet.
-                                    </li>
-                                )}
-                                {drugs.map((d, i) => (
-                                    <li key={d.name} className="rounded-xl border border-gray-200 p-3">
-                                        <div className="flex items-start gap-3">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={d.image} alt="" className="h-10 w-10 shrink-0 rounded-md border border-gray-200 object-cover" />
-                                            <div className="min-w-0 flex-1">
-                                                <p className="truncate text-xs font-semibold text-gray-900">{d.name}</p>
-                                                <p className="text-[11px] text-gray-500">{naira(d.price)} each</p>
-                                            </div>
-                                            <p className="shrink-0 text-xs font-semibold text-gray-900">{naira(d.price * d.quantity)}</p>
-                                            {!readOnly && (
-                                                <button type="button" onClick={() => removeDrug(i)} aria-label={`Remove ${d.name}`} className="shrink-0 text-gray-500 hover:text-red-600">
-                                                    <TrashIcon />
-                                                </button>
-                                            )}
-                                        </div>
+  const isCompleted =
+    detail?.status?.toLowerCase().includes("complete") ||
+    detail?.status?.toLowerCase().includes("dispens");
 
-                                        <div className="mt-2.5 flex items-center gap-2">
-                                            <input
-                                                value={d.dosage}
-                                                disabled={readOnly}
-                                                onChange={(e) => {
-                                                    patchDrug(i, { dosage: e.target.value });
-                                                    setError("");
-                                                }}
-                                                placeholder="Dosage instructions"
-                                                className={INPUT}
-                                            />
-                                            <div className="flex shrink-0 items-center rounded-lg border border-gray-300">
-                                                <button type="button" disabled={readOnly || d.quantity <= 1} onClick={() => patchDrug(i, { quantity: d.quantity - 1 })} className="px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40" aria-label="Decrease quantity">−</button>
-                                                <span className="w-6 text-center text-xs font-semibold">{d.quantity}</span>
-                                                <button type="button" disabled={readOnly} onClick={() => patchDrug(i, { quantity: d.quantity + 1 })} className="px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40" aria-label="Increase quantity">+</button>
-                                            </div>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </section>
-                </div>
+  const filteredMedicines = useMemo(() => {
+    const q = medQuery.trim().toLowerCase();
+    if (!q) return catalog.slice(0, 12);
+    return catalog
+      .filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) &&
+          !prescribedItems.some((d) => d.product_id === c.id)
+      )
+      .slice(0, 12);
+  }, [catalog, medQuery, prescribedItems]);
 
-                {/* Footer */}
-                <div className="border-t border-gray-200 bg-white px-5 py-4">
-                    {error && <p role="alert" className="mb-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+  const addDrugFromCatalog = (c: CatalogProduct) => {
+    setPrescribedItems((prev) => [
+      ...prev,
+      {
+        product_id: c.id,
+        name: c.name,
+        dosage_instructions: "1 tablet twice daily after meals",
+        quantity: 1,
+        unit_price: Number(c.price) || 0,
+        image: c.image,
+      },
+    ]);
+    setMedQuery("");
+    setPickerOpen(false);
+    setError("");
+  };
 
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <p className="text-[11px] text-gray-500">Prescription total</p>
-                            <p className="text-xl font-semibold text-gray-900">{naira(total)}</p>
-                        </div>
+  const addCustomDrug = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const customId = Math.floor(100000 + Math.random() * 900000);
+    setPrescribedItems((prev) => [
+      ...prev,
+      {
+        product_id: customId,
+        name: trimmed,
+        dosage_instructions: "1 tablet twice daily after meals",
+        quantity: 1,
+        unit_price: 2000,
+      },
+    ]);
+    setMedQuery("");
+    setPickerOpen(false);
+    setError("");
+  };
 
-                        <div className="flex flex-wrap items-center gap-2">
-                            <button onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-2.5 text-xs font-semibold text-gray-800 hover:bg-gray-50">
-                                {readOnly ? "Close" : "Cancel"}
-                            </button>
-
-                            {item.status === "ready" && (
-                                <button onClick={dispense} className="inline-flex items-center gap-1.5 rounded-lg border border-green-600 px-4 py-2.5 text-xs font-semibold text-green-700 hover:bg-green-50">
-                                    <CheckIcon /> Mark as Dispensed
-                                </button>
-                            )}
-
-                            {!readOnly && (
-                                <button onClick={send} className="rounded-lg bg-blue-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700">
-                                    {item.status === "ready" ? "Update Prescription" : "Send Prescription"}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </aside>
-        </div>
+  const patchDrug = (index: number, patch: Partial<PrescribeFormItem>) => {
+    setPrescribedItems((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item))
     );
+  };
+
+  const removeDrug = (index: number) => {
+    setPrescribedItems((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handlePrescribeSubmit = async () => {
+    setError("");
+    const doc = doctorName === "custom" ? customDoctor.trim() : doctorName;
+    if (!doc) {
+      setError("Please specify the prescribing doctor's name.");
+      return;
+    }
+    if (!notes.trim()) {
+      setError("Please enter the clinical doctor's note for the patient.");
+      return;
+    }
+    if (prescribedItems.length === 0) {
+      setError("Please add at least one medication to the prescription.");
+      return;
+    }
+    for (const item of prescribedItems) {
+      if (!item.dosage_instructions.trim()) {
+        setError(`Please provide dosage instructions for ${item.name}.`);
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        doctor_name: doc,
+        doctor_note: notes.trim(),
+        items: prescribedItems.map((item) => ({
+          product_id: item.product_id,
+          dosage_instructions: item.dosage_instructions.trim(),
+          quantity: item.quantity,
+        })),
+      };
+
+      const res = await fetch(`/api/gload/lab-tests/${reference}/prescription/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.status === 401) {
+        window.location.href = "/glopharm/login?session_expired=1";
+        return;
+      }
+
+      const resData = await res.json();
+      if (!res.ok) {
+        setError(resData.message || resData.detail || "Failed to issue prescription.");
+        setSubmitting(false);
+        return;
+      }
+
+      onPrescriptionSuccess();
+      await fetchDetail();
+    } catch {
+      setError("An unexpected network error occurred while submitting.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Primary file: either detail.file or detail.files[0]
+  const primaryFile =
+    detail?.file || (detail?.files && detail.files.length > 0 ? detail.files[0] : null);
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Lab test ${reference}`}
+        className="relative flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl transition-all"
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 border-b border-gray-200 px-6 py-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold tracking-wider text-blue-600 uppercase">
+              #{reference} {detail?.created_at ? `· ${formatDate(detail.created_at)}` : ""}
+            </p>
+            <h2 className="mt-0.5 truncate text-lg font-bold text-gray-900">
+              {detail?.test_name || "Lab Test Details"}
+            </h2>
+            {detail && (
+              <div className="mt-1.5 flex items-center gap-2">
+                <Badge status={detail.status} label={detail.status_label} />
+                {detail.reviewed_at && (
+                  <span className="text-[11px] text-gray-500">
+                    Reviewed: {formatDate(detail.reviewed_at)}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-lg border border-gray-200 p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 space-y-6 overflow-y-auto p-6">
+          {loading ? (
+            <div className="flex h-64 flex-col items-center justify-center gap-3 text-sm text-gray-500">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+              <p>Loading lab test details...</p>
+            </div>
+          ) : !detail ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">
+              {error || "Unable to load lab test details."}
+            </div>
+          ) : (
+            <>
+              {/* Patient Card */}
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Patient Information
+                </h3>
+                <div className="flex items-center gap-3.5 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                    {detail.patient.initials || initials(detail.patient.name)}
+                  </span>
+                  <div className="min-w-0 text-xs flex-1">
+                    <p className="text-sm font-bold text-gray-900">{detail.patient.name}</p>
+                    <p className="truncate text-gray-600">{detail.patient.email}</p>
+                    {detail.patient.phone && (
+                      <p className="text-gray-500 font-mono mt-0.5">{detail.patient.phone}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Patient Symptoms */}
+                <div className="mt-3 rounded-xl bg-gray-50 border border-gray-200/70 p-3.5 text-xs text-gray-700">
+                  <p className="mb-1 font-semibold text-gray-800">Reported Symptoms</p>
+                  <p className="italic text-gray-600">
+                    {detail.symptoms?.trim() || "No symptoms reported by patient."}
+                  </p>
+                </div>
+              </section>
+
+              {/* Lab Report File */}
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Uploaded Lab Report
+                </h3>
+                <ReportPreview file={primaryFile} />
+
+                {/* Multiple files if present */}
+                {detail.files && detail.files.length > 1 && (
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-[11px] font-semibold text-gray-500 uppercase">
+                      Additional Documents ({detail.files.length})
+                    </p>
+                    {detail.files.map((f, idx) => (
+                      <a
+                        key={f.id || idx}
+                        href={f.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-2.5 text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        <span className="flex items-center gap-2 truncate">
+                          <FileIcon className="h-4 w-4 text-blue-600 shrink-0" />
+                          <span className="truncate">{f.original_name || `File ${idx + 1}`}</span>
+                        </span>
+                        <span className="text-blue-600 font-semibold shrink-0">Open</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Existing Prescription Summary (if available) */}
+              {detail.prescription && (
+                <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-blue-900">
+                      Current Prescription on File
+                    </h3>
+                    {detail.prescription.order && (
+                      <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700">
+                        Order #{detail.prescription.order.order_number} ({detail.prescription.order.status})
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs font-semibold text-gray-900">
+                    Doctor: {detail.prescription.doctor_name}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-700 bg-white p-2.5 rounded-lg border border-blue-100 italic">
+                    &ldquo;{detail.prescription.doctor_note}&rdquo;
+                  </p>
+                </section>
+              )}
+
+              {/* Prescription Form / Medication List */}
+              <section className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                    {detail.prescription ? "Prescription Medications" : "Create Prescription"}
+                  </h3>
+                  {isCompleted && (
+                    <span className="text-[11px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                      Dispensed
+                    </span>
+                  )}
+                </div>
+
+                {/* Prescribing Doctor Selector */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-gray-800">
+                    Prescribing Doctor
+                  </label>
+                  <select
+                    value={doctorName}
+                    onChange={(e) => setDoctorName(e.target.value)}
+                    disabled={isCompleted}
+                    className={INPUT}
+                  >
+                    {DOCTORS.map((d) => (
+                      <option key={d.name} value={d.name}>
+                        {d.name} — {d.role}
+                      </option>
+                    ))}
+                    <option value="custom">Other / Custom Doctor Name...</option>
+                  </select>
+                  {doctorName === "custom" && (
+                    <input
+                      type="text"
+                      placeholder="Enter doctor's full name"
+                      value={customDoctor}
+                      onChange={(e) => setCustomDoctor(e.target.value)}
+                      className={`${INPUT} mt-2`}
+                    />
+                  )}
+                </div>
+
+                {/* Doctor Note */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-gray-800">
+                    Doctor&apos;s Clinical Note (Sent to patient)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={notes}
+                    disabled={isCompleted}
+                    onChange={(e) => {
+                      setNotes(e.target.value);
+                      setError("");
+                    }}
+                    placeholder="e.g. Moderate Plasmodium falciparum (+2) detected. ACT, immune support and analgesic prescribed for 3 days."
+                    className={`${INPUT} resize-none`}
+                  />
+                </div>
+
+                {/* Medications Adder */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-gray-800">
+                      Prescribed Medications
+                    </label>
+                    <span className="text-[11px] text-gray-500">
+                      {prescribedItems.length} item(s) selected
+                    </span>
+                  </div>
+
+                  {!isCompleted && (
+                    <div ref={pickerRef} className="relative">
+                      <input
+                        value={medQuery}
+                        onChange={(e) => {
+                          setMedQuery(e.target.value);
+                          setPickerOpen(true);
+                        }}
+                        onFocus={() => setPickerOpen(true)}
+                        placeholder="Search medicines catalog to add (e.g. Paracetamol, ACT)..."
+                        className={`${INPUT} pr-10`}
+                      />
+                      <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                        {searchingMed ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                        ) : (
+                          <SearchIcon />
+                        )}
+                      </span>
+
+                      {pickerOpen && (
+                        <div
+                          className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 shadow-2xl"
+                        >
+                          <div className="flex items-center justify-between px-2.5 py-1 text-[11px] font-semibold text-gray-400 uppercase">
+                            <span>Available Drugs & Products</span>
+                            {searchingMed && <span className="text-blue-600 lowercase font-normal">searching...</span>}
+                          </div>
+
+                          {filteredMedicines.length === 0 ? (
+                            <div className="px-3 py-3 text-center text-xs text-gray-500">
+                              No matching drugs in catalog.
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              {filteredMedicines.map((c) => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => addDrugFromCatalog(c)}
+                                  className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-blue-50 transition cursor-pointer"
+                                >
+                                  {c.image ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={c.image}
+                                      alt=""
+                                      className="h-8 w-8 shrink-0 rounded-md border border-gray-200 object-cover"
+                                    />
+                                  ) : (
+                                    <div className="h-8 w-8 rounded-md bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-[10px]">
+                                      RX
+                                    </div>
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-xs font-semibold text-gray-800">
+                                      {c.name}
+                                    </p>
+                                    {c.category && (
+                                      <p className="text-[10px] text-gray-400 capitalize">
+                                        {c.category}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <span className="shrink-0 text-xs font-bold text-gray-700">
+                                    {naira(c.price)}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {medQuery.trim() && (
+                            <div className="mt-2 pt-2 border-t border-gray-100">
+                              <button
+                                type="button"
+                                onClick={() => addCustomDrug(medQuery)}
+                                className="flex w-full items-center gap-2 rounded-lg border border-dashed border-blue-300 bg-blue-50/70 p-2.5 text-left text-xs font-semibold text-blue-700 hover:bg-blue-100/80 transition cursor-pointer"
+                              >
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white text-[11px] font-bold">
+                                  +
+                                </span>
+                                <span className="truncate">
+                                  Add &ldquo;{medQuery.trim()}&rdquo; as custom medication
+                                </span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Medicines List */}
+                  <ul className="mt-3 space-y-2.5">
+                    {prescribedItems.length === 0 ? (
+                      <li className="rounded-xl border border-dashed border-gray-300 bg-gray-50/50 px-4 py-8 text-center text-xs text-gray-500">
+                        No medications prescribed yet. Search above to add items.
+                      </li>
+                    ) : (
+                      prescribedItems.map((item, idx) => (
+                        <li
+                          key={item.product_id || idx}
+                          className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
+                        >
+                          <div className="flex items-start gap-3">
+                            {item.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={item.image}
+                                alt=""
+                                className="h-10 w-10 shrink-0 rounded-md border border-gray-200 object-cover"
+                              />
+                            ) : (
+                              <div className="h-10 w-10 shrink-0 rounded-md bg-blue-50 border border-blue-100 flex items-center justify-center font-bold text-blue-600 text-xs">
+                                RX
+                              </div>
+                            )}
+
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-bold text-gray-900">
+                                {item.name}
+                              </p>
+                              <p className="text-[11px] text-gray-500">
+                                {naira(item.unit_price)} each · Subtotal:{" "}
+                                <span className="font-semibold text-gray-800">
+                                  {naira(Number(item.unit_price) * item.quantity)}
+                                </span>
+                              </p>
+                            </div>
+
+                            {!isCompleted && (
+                              <button
+                                type="button"
+                                onClick={() => removeDrug(idx)}
+                                aria-label={`Remove ${item.name}`}
+                                className="shrink-0 text-gray-400 hover:text-red-600 p-1 transition"
+                              >
+                                <TrashIcon />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Dosage & Quantity controls */}
+                          <div className="mt-2.5 flex items-center gap-2">
+                            <input
+                              value={item.dosage_instructions}
+                              disabled={isCompleted}
+                              onChange={(e) =>
+                                patchDrug(idx, { dosage_instructions: e.target.value })
+                              }
+                              placeholder="Dosage instructions (e.g. 1 tablet twice daily)"
+                              className={INPUT}
+                            />
+                            <div className="flex shrink-0 items-center rounded-lg border border-gray-300 bg-white">
+                              <button
+                                type="button"
+                                disabled={isCompleted || item.quantity <= 1}
+                                onClick={() =>
+                                  patchDrug(idx, { quantity: Math.max(1, item.quantity - 1) })
+                                }
+                                className="px-2.5 py-2 text-sm font-bold text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+                              >
+                                −
+                              </button>
+                              <span className="w-7 text-center text-xs font-semibold">
+                                {item.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                disabled={isCompleted}
+                                onClick={() => patchDrug(idx, { quantity: item.quantity + 1 })}
+                                className="px-2.5 py-2 text-sm font-bold text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-gray-200 bg-white px-6 py-4">
+          {error && (
+            <p role="alert" className="mb-3 rounded-lg bg-red-50 p-2.5 text-xs font-medium text-red-600 border border-red-200">
+              {error}
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                Prescription Total
+              </p>
+              <p className="text-xl font-bold text-gray-900">{naira(totalCalculated)}</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onClose}
+                className="rounded-lg border border-gray-300 px-4 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
+              >
+                {isCompleted ? "Close" : "Cancel"}
+              </button>
+
+              {!isCompleted && (
+                <button
+                  onClick={handlePrescribeSubmit}
+                  disabled={submitting}
+                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 transition cursor-pointer flex items-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Issuing...
+                    </>
+                  ) : detail?.prescription ? (
+                    "Update Prescription"
+                  ) : (
+                    "Issue Prescription"
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Page                                                                       */
+/*  Main Page Component                                                       */
 /* -------------------------------------------------------------------------- */
 
 export default function LabTestsPage() {
-    return (
-        <Suspense fallback={<div className="p-6 text-sm text-gray-500">Loading…</div>}>
-            <LabTestsPageInner />
-        </Suspense>
-    );
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-gray-500">Loading Lab Tests…</div>}>
+      <LabTestsPageInner />
+    </Suspense>
+  );
 }
 
 function LabTestsPageInner() {
-    const router = useRouter();
-    const pathname = usePathname();
-    const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-    const [items, setItems] = useState<LabSubmission[]>(SEED);
-    const [query, setQuery] = useState("");
-    const [openId, setOpenId] = useState<string | null>(null);
-    const [toast, setToast] = useState<string | null>(null);
+  // API Data States
+  const [stats, setStats] = useState<LabTestStats | null>(null);
+  const [tests, setTests] = useState<LabTestItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [selectedRef, setSelectedRef] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-    // Active tab lives in the URL (?status=reviewing) so the sidebar can link to it
-    const statusParam = searchParams.get("status");
-    const tab: TabKey = TABS.some((t) => t.key === statusParam) ? (statusParam as TabKey) : "all";
-    const setTab = (t: TabKey) =>
-        router.replace(t === "all" ? pathname : `${pathname}?status=${t}`, { scroll: false });
+  // Tab active state from URL (?status=under_review)
+  const statusParam = searchParams.get("status") || "all";
+  const tab: TabKey = TABS.some((t) => t.key === statusParam) ? (statusParam as TabKey) : "all";
 
-    const counts = {
-        all: items.length,
-        reviewing: items.filter((i) => i.status === "reviewing").length,
-        ready: items.filter((i) => i.status === "ready").length,
-        completed: items.filter((i) => i.status === "completed").length,
-    };
-    const pendingValue = items.filter((i) => i.status === "ready").reduce((s, i) => s + (i.totalCost ?? 0), 0);
+  const setTab = (t: TabKey) => {
+    router.replace(t === "all" ? pathname : `${pathname}?status=${t}`, { scroll: false });
+  };
 
-    const filtered = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        return items.filter(
-            (i) =>
-                (tab === "all" || i.status === tab) &&
-                (!q || i.id.toLowerCase().includes(q) || i.title.toLowerCase().includes(q) || i.patient.name.toLowerCase().includes(q))
-        );
-    }, [items, query, tab]);
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 4500);
+  };
 
-    const openItem = items.find((i) => i.id === openId) ?? null;
+  // Fetch Stats
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/gload/lab-tests/stats");
+      if (res.status === 401) {
+        window.location.href = "/glopharm/login?session_expired=1";
+        return;
+      }
+      const json = await res.json();
+      if (json?.data) {
+        setStats(json.data);
+      }
+    } catch {
+      // non-critical
+    }
+  }, []);
 
-    const showToast = (msg: string) => {
-        setToast(msg);
-        setTimeout(() => setToast(null), 4000);
-    };
+  // Fetch Tests list
+  const fetchTests = useCallback(async () => {
+    setLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      if (tab !== "all") {
+        qs.set("status", tab);
+      }
+      if (query.trim()) {
+        qs.set("search", query.trim());
+      }
 
-    const replace = (updated: LabSubmission) => setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+      const res = await fetch(`/api/gload/lab-tests?${qs.toString()}`);
+      if (res.status === 401) {
+        window.location.href = "/glopharm/login?session_expired=1";
+        return;
+      }
+      const json = await res.json();
+      const results = json?.data?.results || json?.results || [];
+      setTests(Array.isArray(results) ? results : []);
+    } catch {
+      setTests([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [tab, query]);
 
-    const handleSave = async (updated: LabSubmission) => {
-        // TODO: await fetch(`/api/lab-tests/${updated.id}/prescription`, { method: "PUT", body: JSON.stringify(updated) });
-        const wasReady = items.find((i) => i.id === updated.id)?.status === "ready";
-        replace(updated);
-        setOpenId(null);
-        showToast(wasReady ? `Prescription for #${updated.id} updated.` : `Prescription sent — ${updated.patient.name} can now check out.`);
-    };
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
-    const handleComplete = async (updated: LabSubmission) => {
-        // TODO: await fetch(`/api/lab-tests/${updated.id}/complete`, { method: "POST" });
-        replace(updated);
-        setOpenId(null);
-        showToast(`#${updated.id} marked as dispensed.`);
-    };
+  useEffect(() => {
+    fetchTests();
+  }, [fetchTests]);
 
-    const tabLabel = TABS.find((t) => t.key === tab)?.label ?? "All Tests";
+  // Client-side filter fallback in case backend does partial filtering
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return tests.filter((t) => {
+      // status match
+      const s = t.status?.toLowerCase() || "";
+      let matchesTab = true;
+      if (tab === "under_review") {
+        matchesTab = s.includes("review");
+      } else if (tab === "awaiting_payment") {
+        matchesTab = s.includes("payment") || s === "ready";
+      } else if (tab === "completed") {
+        matchesTab = s.includes("complete") || s.includes("dispens");
+      }
 
-    return (
-        <div className="p-6">
-            {/* Toast */}
-            {toast && (
-                <div role="status" className="fixed right-6 top-6 z-[60] flex items-center gap-2.5 rounded-xl bg-green-600 px-4 py-3 text-xs font-medium text-white shadow-xl">
-                    <CheckIcon />
-                    {toast}
-                </div>
-            )}
+      if (!matchesTab) return false;
+      if (!q) return true;
 
-            {/* Title + breadcrumb */}
-            <h1 className="text-2xl font-semibold text-gray-900">Lab Tests</h1>
-            <nav className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                <span>Dashboard</span>
-                <CaretRight />
-                <span>Lab Tests</span>
-                <CaretRight />
-                <span className="font-medium text-blue-600">{tabLabel}</span>
-            </nav>
+      return (
+        t.reference?.toLowerCase().includes(q) ||
+        t.test_name?.toLowerCase().includes(q) ||
+        t.patient?.name?.toLowerCase().includes(q) ||
+        t.patient?.email?.toLowerCase().includes(q)
+      );
+    });
+  }, [tests, tab, query]);
 
-            {/* Stat cards */}
-            <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
-                <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-sm">
-                    <p className="text-sm font-semibold">Awaiting Review</p>
-                    <p className="mt-4 text-3xl font-semibold">{counts.reviewing}</p>
-                    <p className="mt-1 text-[11px] text-white/80">Need a prescription</p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm font-semibold text-gray-800">Awaiting Payment</p>
-                    <p className="mt-4 text-3xl font-semibold text-blue-600">{counts.ready}</p>
-                    <p className="mt-1 text-[11px] text-gray-500">{naira(pendingValue)} pending</p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm font-semibold text-gray-800">Dispensed</p>
-                    <p className="mt-4 text-3xl font-semibold text-blue-600">{counts.completed}</p>
-                    <p className="mt-1 text-[11px] text-gray-500">Completed prescriptions</p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm font-semibold text-gray-800">Total Reports</p>
-                    <p className="mt-4 text-3xl font-semibold text-blue-600">{counts.all}</p>
-                    <p className="mt-1 text-[11px] text-gray-500">Uploaded by patients</p>
-                </div>
-            </div>
+  const counts = {
+    all: stats?.total_reports ?? tests.length,
+    under_review: stats?.awaiting_review ?? tests.filter((t) => t.status?.includes("review")).length,
+    awaiting_payment:
+      stats?.awaiting_payment?.count ??
+      tests.filter((t) => t.status?.includes("payment") || t.status === "ready").length,
+    completed: stats?.dispensed ?? tests.filter((t) => t.status?.includes("complete")).length,
+  };
 
-            <section className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-                {/* Search */}
-                <div className="relative w-full max-w-sm">
-                    <input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search for id, patient, test"
-                        className="w-full rounded-full border border-gray-300 bg-white py-2 pl-4 pr-10 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    />
-                    <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-600">
-                        <SearchIcon />
-                    </span>
-                </div>
+  const pendingAmount = stats?.awaiting_payment?.pending_amount || "0.00";
 
-                {/* Tabs */}
-                <div className="mt-4 flex overflow-x-auto rounded-xl border border-gray-200 p-1">
-                    {TABS.map((t) => (
-                        <button
-                            key={t.key}
-                            onClick={() => setTab(t.key)}
-                            className={`flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${tab === t.key ? "bg-blue-100 text-blue-600" : "text-gray-700 hover:bg-gray-50"
-                                }`}
-                        >
-                            {t.label} ({counts[t.key]})
-                        </button>
-                    ))}
-                </div>
-
-                {/* Desktop table */}
-                <div className="mt-4 hidden overflow-x-auto rounded-xl border border-gray-200 md:block">
-                    <table className="w-full min-w-[820px] border-collapse">
-                        <thead className="bg-gray-100 text-left text-xs font-semibold text-gray-700">
-                            <tr>
-                                <th className="px-4 py-3.5">Test</th>
-                                <th className="px-4 py-3.5">Patient</th>
-                                <th className="px-4 py-3.5">Uploaded</th>
-                                <th className="px-4 py-3.5">Report</th>
-                                <th className="px-4 py-3.5">Status</th>
-                                <th className="px-4 py-3.5">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {filtered.length === 0 && (
-                                <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-gray-500">No lab tests found.</td></tr>
-                            )}
-                            {filtered.map((i) => (
-                                <tr key={i.id} className="hover:bg-gray-50/70">
-                                    <td className="px-4 py-3">
-                                        <button onClick={() => setOpenId(i.id)} className="text-[11px] font-medium text-blue-600 hover:underline">#{i.id}</button>
-                                        <p className="max-w-[240px] truncate text-xs font-medium text-gray-800">{i.title}</p>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-2.5">
-                                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-blue-700">{initials(i.patient.name)}</span>
-                                            <span className="text-xs text-gray-800">{i.patient.name}</span>
-                                        </div>
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-700">{i.date}</td>
-                                    <td className="px-4 py-3">
-                                        <span className="flex max-w-[170px] items-center gap-1.5 text-xs text-gray-600">
-                                            <FileIcon className="h-4 w-4 shrink-0" />
-                                            <span className="truncate">{i.fileName}</span>
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3"><Badge status={i.status} /></td>
-                                    <td className="px-4 py-3">
-                                        <button
-                                            onClick={() => setOpenId(i.id)}
-                                            className={`whitespace-nowrap rounded-lg px-3.5 py-2 text-xs font-semibold ${i.status === "reviewing"
-                                                    ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700"
-                                                    : "border border-gray-300 text-gray-800 hover:bg-gray-50"
-                                                }`}
-                                        >
-                                            {i.status === "reviewing" ? "Review & Prescribe" : i.status === "ready" ? "View / Edit" : "View"}
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Mobile cards */}
-                <ul className="mt-4 space-y-3 md:hidden">
-                    {filtered.length === 0 && <li className="py-10 text-center text-sm text-gray-500">No lab tests found.</li>}
-                    {filtered.map((i) => (
-                        <li key={i.id} className="rounded-xl border border-gray-200 p-4">
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                    <p className="text-[11px] font-medium text-blue-600">#{i.id}</p>
-                                    <p className="truncate text-sm font-semibold text-gray-900">{i.title}</p>
-                                    <p className="mt-0.5 text-xs text-gray-500">{i.patient.name} · {i.date}</p>
-                                </div>
-                                <Badge status={i.status} />
-                            </div>
-                            <button
-                                onClick={() => setOpenId(i.id)}
-                                className={`mt-3 w-full rounded-lg px-3.5 py-2.5 text-xs font-semibold ${i.status === "reviewing" ? "bg-blue-600 text-white" : "border border-gray-300 text-gray-800"
-                                    }`}
-                            >
-                                {i.status === "reviewing" ? "Review & Prescribe" : i.status === "ready" ? "View / Edit" : "View"}
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            </section>
-
-            {/* key resets the form whenever a different test is opened */}
-            {openItem && (
-                <ReviewDrawer
-                    key={openItem.id}
-                    item={openItem}
-                    onClose={() => setOpenId(null)}
-                    onSave={handleSave}
-                    onComplete={handleComplete}
-                />
-            )}
+  return (
+    <div className="p-6">
+      {/* Toast */}
+      {toast && (
+        <div
+          role="status"
+          className="fixed right-6 top-6 z-[60] flex items-center gap-2.5 rounded-xl bg-green-600 px-4 py-3 text-xs font-semibold text-white shadow-xl animate-fade-in"
+        >
+          <CheckIcon />
+          {toast}
         </div>
-    );
+      )}
+
+      {/* Title & Breadcrumbs */}
+      <h1 className="text-2xl font-bold text-gray-900">Lab Tests & Prescriptions</h1>
+      <nav className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+        <span>Dashboard</span>
+        <CaretRight />
+        <span>Lab Tests</span>
+        <CaretRight />
+        <span className="font-semibold text-blue-600">
+          {TABS.find((t) => t.key === tab)?.label || "All Tests"}
+        </span>
+      </nav>
+
+      {/* Stats Cards */}
+      <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {/* Awaiting Review */}
+        <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-blue-100">
+            Awaiting Review
+          </p>
+          <p className="mt-3 text-3xl font-extrabold">{counts.under_review}</p>
+          <p className="mt-1 text-[11px] text-white/80">Require clinical review & prescription</p>
+        </div>
+
+        {/* Awaiting Payment */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+            Awaiting Payment
+          </p>
+          <p className="mt-3 text-3xl font-extrabold text-blue-600">{counts.awaiting_payment}</p>
+          <p className="mt-1 text-[11px] text-gray-500">{naira(pendingAmount)} pending checkout</p>
+        </div>
+
+        {/* Dispensed */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+            Dispensed
+          </p>
+          <p className="mt-3 text-3xl font-extrabold text-green-600">{counts.completed}</p>
+          <p className="mt-1 text-[11px] text-gray-500">Paid and dispensed orders</p>
+        </div>
+
+        {/* Total Reports */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+            Total Reports
+          </p>
+          <p className="mt-3 text-3xl font-extrabold text-gray-900">{counts.all}</p>
+          <p className="mt-1 text-[11px] text-gray-500">Uploaded patient records</p>
+        </div>
+      </div>
+
+      {/* Main Section */}
+      <section className="mt-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        {/* Search */}
+        <div className="relative w-full max-w-sm">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by ref (e.g. LAB-002), patient, test..."
+            className="w-full rounded-full border border-gray-300 bg-white py-2 pl-4 pr-10 text-xs text-gray-800 outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          />
+          <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+            <SearchIcon />
+          </span>
+        </div>
+
+        {/* Tabs */}
+        <div className="mt-4 flex overflow-x-auto rounded-xl border border-gray-200 p-1">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-xs font-bold transition-colors cursor-pointer ${
+                tab === t.key
+                  ? "bg-blue-100 text-blue-600"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              }`}
+            >
+              {t.label} ({counts[t.key]})
+            </button>
+          ))}
+        </div>
+
+        {/* Desktop Table */}
+        <div className="mt-4 hidden overflow-x-auto rounded-xl border border-gray-200 md:block">
+          <table className="w-full min-w-[820px] border-collapse">
+            <thead className="bg-gray-50 text-left text-xs font-semibold text-gray-600 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3.5">Reference & Test</th>
+                <th className="px-4 py-3.5">Patient</th>
+                <th className="px-4 py-3.5">Uploaded</th>
+                <th className="px-4 py-3.5">Report Document</th>
+                <th className="px-4 py-3.5">Status</th>
+                <th className="px-4 py-3.5 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-16 text-center text-sm text-gray-500">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                      Loading lab records...
+                    </div>
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-gray-500">
+                    No lab tests found.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((item) => (
+                  <tr key={item.reference} className="hover:bg-gray-50/70 transition">
+                    {/* Ref & Test */}
+                    <td className="px-4 py-3.5">
+                      <button
+                        onClick={() => setSelectedRef(item.reference)}
+                        className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                      >
+                        #{item.reference}
+                      </button>
+                      <p className="max-w-[240px] truncate text-xs font-medium text-gray-900">
+                        {item.test_name}
+                      </p>
+                    </td>
+
+                    {/* Patient */}
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700">
+                          {item.patient.initials || initials(item.patient.name)}
+                        </span>
+                        <div className="min-w-0 text-xs">
+                          <p className="font-semibold text-gray-900">{item.patient.name}</p>
+                          <p className="truncate text-gray-500">{item.patient.email}</p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Date */}
+                    <td className="whitespace-nowrap px-4 py-3.5 text-xs text-gray-600">
+                      {formatDate(item.created_at)}
+                    </td>
+
+                    {/* Document */}
+                    <td className="px-4 py-3.5">
+                      {item.file ? (
+                        <a
+                          href={item.file.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex max-w-[180px] items-center gap-1.5 text-xs text-blue-600 hover:underline"
+                        >
+                          <FileIcon className="h-4 w-4 shrink-0 text-gray-500" />
+                          <span className="truncate">{item.file.original_name || "Document"}</span>
+                        </a>
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">None</span>
+                      )}
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-4 py-3.5">
+                      <Badge status={item.status} label={item.status_label} />
+                    </td>
+
+                    {/* Action */}
+                    <td className="px-4 py-3.5 text-right">
+                      <button
+                        onClick={() => setSelectedRef(item.reference)}
+                        className={`whitespace-nowrap rounded-lg px-3.5 py-2 text-xs font-bold cursor-pointer transition ${
+                          item.status?.toLowerCase().includes("review")
+                            ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700"
+                            : "border border-gray-300 text-gray-800 hover:bg-gray-100"
+                        }`}
+                      >
+                        {item.action_label ||
+                          (item.status?.toLowerCase().includes("review")
+                            ? "Review & Prescribe"
+                            : "View Details")}
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile View */}
+        <ul className="mt-4 space-y-3 md:hidden">
+          {loading ? (
+            <li className="py-10 text-center text-sm text-gray-500">Loading lab tests...</li>
+          ) : filtered.length === 0 ? (
+            <li className="py-10 text-center text-sm text-gray-500">No lab tests found.</li>
+          ) : (
+            filtered.map((item) => (
+              <li
+                key={item.reference}
+                className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-blue-600">#{item.reference}</p>
+                    <p className="truncate text-sm font-bold text-gray-900">{item.test_name}</p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {item.patient.name} · {formatDate(item.created_at)}
+                    </p>
+                  </div>
+                  <Badge status={item.status} label={item.status_label} />
+                </div>
+                <button
+                  onClick={() => setSelectedRef(item.reference)}
+                  className={`mt-3 w-full rounded-lg px-3.5 py-2.5 text-xs font-bold transition cursor-pointer ${
+                    item.status?.toLowerCase().includes("review")
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "border border-gray-300 text-gray-800"
+                  }`}
+                >
+                  {item.action_label ||
+                    (item.status?.toLowerCase().includes("review")
+                      ? "Review & Prescribe"
+                      : "View Details")}
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      </section>
+
+      {/* Review & Prescribe Drawer */}
+      {selectedRef && (
+        <ReviewDrawer
+          key={selectedRef}
+          reference={selectedRef}
+          onClose={() => setSelectedRef(null)}
+          onPrescriptionSuccess={() => {
+            showToast(`Prescription for #${selectedRef} issued successfully.`);
+            fetchStats();
+            fetchTests();
+          }}
+        />
+      )}
+    </div>
+  );
 }

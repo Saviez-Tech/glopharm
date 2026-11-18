@@ -36,7 +36,7 @@ const CATEGORIES = ["Supplements", "Medicines", "Devices", "First Aid"];
 const pad = (n: number) => String(n).padStart(2, "0");
 const toISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const daysFromNow = (n: number) => {
-    const d = new Date();
+    const d = new Date("2026-11-18T00:00:00Z");
     d.setDate(d.getDate() + n);
     return toISO(d);
 };
@@ -81,7 +81,7 @@ const buildSeed = (): PromoCode[] => [
 /* --------------------------------- Status --------------------------------- */
 
 function getStatus(p: PromoCode): PromoStatus {
-    const today = toISO(new Date());
+    const today = "2026-11-18";
     if (p.endDate && today > p.endDate) return "expired";
     if (p.usageLimit && p.used >= p.usageLimit) return "used_up";
     if (!p.active) return "paused";
@@ -192,7 +192,7 @@ const toForm = (p: PromoCode | null): FormState =>
             minOrder: "",
             usageLimit: "",
             perCustomerLimit: "1",
-            startDate: toISO(new Date()),
+            startDate: "2026-11-18",
             endDate: "",
             scope: "all",
             categories: [],

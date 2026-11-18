@@ -1,307 +1,250 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-/* -------------------------------------------------------------------------- */
-/*  ADD YOUR OWN IMAGE                                                         */
-/*  Option 1: drop your screenshot at  public/images/auth-preview.png          */
-/*  Option 2: change AUTH_IMAGE below to any path / URL.                       */
-/*  Option 3: click the placeholder in the blue panel to pick a file (preview) */
-/*  Optionally give each slide its own `image`.                                */
-/* -------------------------------------------------------------------------- */
-const AUTH_IMAGE = "/images/auth-preview.png";
+export default function AdminLoginPage() {
+  const router = useRouter();
 
-const SLIDES: { title: string; text: string; image?: string }[] = [
-    {
-        title: "Easy-to-Use Dashboard for Managing Your Business.",
-        text: "Streamline Your Business Management with Our User-Friendly Dashboard. Simplify complex tasks, track key metrics, and make informed decisions effortlessly.",
-    },
-    {
-        title: "Track Every Product and Sale in Real Time.",
-        text: "Keep an eye on stock levels, orders and revenue from a single, clean overview built for busy teams.",
-    },
-    {
-        title: "Grow Faster With Insights That Matter.",
-        text: "Spot trends early with clear reports and make confident decisions for your store every day.",
-    },
-];
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // If already logged in as staff, go straight to dashboard
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.data?.authenticated) router.replace("/glopharm");
+      })
+      .catch(() => { });
+  }, [router]);
 
-/* -------------------------------- Icons ---------------------------------- */
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
 
-const Logo = () => (
-    <div className="flex items-center gap-2">
-        <svg viewBox="0 0 48 44" className="h-9 w-10" aria-hidden>
-            <path d="M2 42 20 6l8 16-10 20Z" fill="#a3e635" />
-            <path d="M20 6h6l20 36H18Z" fill="#2563eb" />
-            <path d="M18 42 28 22l8 20Z" fill="#1d4ed8" />
-        </svg>
-        <span className="text-3xl font-semibold tracking-tight text-gray-800">Culters</span>
-    </div>
-);
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password) {
+      setError("Please fill in both email and password.");
+      return;
+    }
 
-const GoogleIcon = () => (
-    <svg viewBox="0 0 48 48" className="h-5 w-5" aria-hidden>
-        <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5Z" />
-        <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.4 5.7c4.3-4 6.9-9.9 6.9-17.2Z" />
-        <path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1Z" />
-        <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.9 2.3-8.5 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48Z" />
-    </svg>
-);
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: cleanEmail, password }),
+      });
 
-const CheckCircle = () => (
-    <svg viewBox="0 0 24 24" className="h-5 w-5 text-blue-600" fill="none" aria-hidden>
-        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={1.8} />
-        <path d="m7.5 12.5 3 3 6-6.5" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-);
+      const data = await res.json();
 
-const EyeIcon = ({ off }: { off: boolean }) => (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-        <circle cx="12" cy="12" r="3" />
-        {off && <path d="M3 3l18 18" />}
-    </svg>
-);
+      if (!res.ok) {
+        throw new Error(data.message || "Invalid email or password.");
+      }
 
-const Hexagon = ({ className = "" }: { className?: string }) => (
-    <svg viewBox="0 0 100 100" className={className} fill="none" aria-hidden>
-        <path d="M50 3 93 27v46L50 97 7 73V27Z" stroke="currentColor" strokeWidth={2} />
-    </svg>
-);
+      const isStaff = data?.data?.is_staff === true;
+      if (!isStaff) {
+        throw new Error("You do not have admin access. Please use the patient portal.");
+      }
 
-/* ------------------------------- Component ------------------------------- */
+      // Full navigation so cookies are sent on subsequent requests
+      window.location.assign("/glopharm");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to sign in. Please try again.";
+      setError(msg);
+      setIsLoading(false);
+    }
+  };
 
-export default function AuthPage() {
-    const router = useRouter();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [remember, setRemember] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-
-    const [slide, setSlide] = useState(0);
-    const [imgFailed, setImgFailed] = useState(false);
-    const [localImage, setLocalImage] = useState<string | null>(null);
-
-    const emailValid = EMAIL_RE.test(email);
-
-    // Auto-advance the carousel
-    useEffect(() => {
-        const t = setInterval(() => setSlide((s) => (s + 1) % SLIDES.length), 5000);
-        return () => clearInterval(t);
-    }, []);
-
-    // Free object URL when replaced / unmounted
-    useEffect(() => {
-        return () => {
-            if (localImage) URL.revokeObjectURL(localImage);
-        };
-    }, [localImage]);
-
-    const onPickImage = (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setLocalImage(URL.createObjectURL(file));
-    };
-
-    const onSubmit = async (e: FormEvent) => {
-        e.preventDefault();
-        setError("");
-        if (!emailValid) return setError("Please enter a valid email address.");
-        if (password.length < 6) return setError("Password must be at least 6 characters.");
-
-        setLoading(true);
-        try {
-            // TODO: replace with your real auth call, e.g. signIn("credentials", {...})
-            await new Promise((r) => setTimeout(r, 800));
-            console.log({ email, password, remember });
-            router.push('/glopharm');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const current = SLIDES[slide];
-    const imageSrc = localImage ?? current.image ?? AUTH_IMAGE;
-    const showImage = localImage !== null || !imgFailed;
-
-    return (
-        <div className="flex min-h-screen bg-white">
-            {/* ----------------------------- Left: form ---------------------------- */}
-            <section className="flex w-full items-center justify-center px-6 py-10 md:w-1/2 md:px-12">
-                <div className="w-full max-w-md">
-                    <Logo />
-
-                    <h1 className="mt-10 text-2xl font-semibold text-gray-900 md:mt-14">Sign Up</h1>
-                    <p className="mt-1 text-xs text-gray-500">
-                        Lorem ipsum dolor sit amet consectetur. Leo eget quam dui in posuere nulla.
-                    </p>
-
-                    <button
-                        type="button"
-                        className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-blue-600 bg-white py-2.5 text-xs font-semibold text-gray-800 transition hover:bg-blue-50"
-                    >
-                        <GoogleIcon />
-                        <span className="text-blue-700">Sign In with Google</span>
-                    </button>
-
-                    {/* Divider */}
-                    <div className="my-5 flex items-center gap-3 text-xs text-gray-500">
-                        <span className="h-px flex-1 bg-blue-200" />
-                        Or
-                        <span className="h-px flex-1 bg-blue-200" />
-                    </div>
-
-                    <form onSubmit={onSubmit} noValidate className="space-y-4">
-                        {/* Email */}
-                        <div>
-                            <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-gray-800">
-                                Email
-                            </label>
-                            <div className="relative">
-                                <input
-                                    id="email"
-                                    type="email"
-                                    autoComplete="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="Input email"
-                                    className={`w-full rounded-lg border px-3.5 py-3 pr-11 text-xs text-gray-800 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-blue-100 ${emailValid ? "border-blue-600 border-2" : "border-gray-300 focus:border-blue-500"
-                                        }`}
-                                />
-                                {emailValid && (
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                                        <CheckCircle />
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Password */}
-                        <div>
-                            <label htmlFor="password" className="mb-1.5 block text-xs font-semibold text-gray-800">
-                                Password
-                            </label>
-                            <div className="relative">
-                                <input
-                                    id="password"
-                                    type={showPassword ? "text" : "password"}
-                                    autoComplete="current-password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="Input password"
-                                    className="w-full rounded-lg border border-gray-300 px-3.5 py-3 pr-11 text-xs text-gray-800 outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword((v) => !v)}
-                                    aria-label={showPassword ? "Hide password" : "Show password"}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                                >
-                                    <EyeIcon off={!showPassword} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Remember + forgot */}
-                        <div className="flex items-center justify-between text-xs">
-                            <label className="flex cursor-pointer items-center gap-2 font-medium text-gray-800">
-                                <input
-                                    type="checkbox"
-                                    checked={remember}
-                                    onChange={(e) => setRemember(e.target.checked)}
-                                    className="h-4 w-4 rounded border-gray-400 accent-blue-600"
-                                />
-                                Remember me ?
-                            </label>
-                            <a href="/forgot-password" className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700">
-                                Forget Password
-                            </a>
-                        </div>
-
-                        {error && (
-                            <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">
-                                {error}
-                            </p>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full rounded-lg bg-blue-600 py-3 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
-                        >
-                            {loading ? "Signing in..." : "Sign In"}
-                        </button>
-                    </form>
-
-                    <p className="mt-5 text-center text-xs text-gray-700">
-                        Do not have account ?{" "}
-                        <a href="/sign-up" className="font-semibold text-blue-600 hover:underline">
-                            Sign Up
-                        </a>
-                    </p>
-                </div>
-            </section>
-
-            {/* ------------------------ Right: promo panel ------------------------- */}
-            <aside className="relative hidden w-1/2 flex-col items-center justify-center overflow-hidden bg-blue-600 px-10 py-10 text-white md:flex">
-                {/* Decorative hexagons */}
-                <Hexagon className="absolute -top-10 left-1/3 h-44 w-44 text-white/30" />
-                <Hexagon className="absolute -right-10 top-4 h-40 w-40 rotate-12 fill-white/20 text-white/30" />
-                <Hexagon className="absolute -right-16 top-1/2 h-56 w-56 text-white/30" />
-                <Hexagon className="absolute -bottom-20 left-1/4 h-72 w-72 fill-white/20 text-white/40" />
-                <Hexagon className="absolute -left-12 top-24 h-32 w-32 text-white/20" />
-
-                {/* Image slot */}
-                <div className="relative z-10 w-full max-w-[560px]">
-                    {showImage ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            key={imageSrc}
-                            src={imageSrc}
-                            alt="Dashboard preview"
-                            onError={() => setImgFailed(true)}
-                            onLoad={() => setImgFailed(false)}
-                            className="w-full rounded-2xl bg-white object-cover shadow-2xl"
-                        />
-                    ) : (
-                        <label className="flex aspect-[16/10] w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/60 bg-white/10 text-center text-sm backdrop-blur-sm transition hover:bg-white/20">
-                            <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <rect x="3" y="3" width="18" height="18" rx="2" />
-                                <circle cx="9" cy="9" r="1.5" />
-                                <path d="m21 15-5-5L5 21" />
-                            </svg>
-                            <span className="font-semibold">Click to add your image</span>
-                            <span className="px-6 text-xs text-white/80">
-                                or save it as <code className="rounded bg-white/20 px-1">public/images/auth-preview.png</code>
-                            </span>
-                            <input type="file" accept="image/*" onChange={onPickImage} className="hidden" />
-                        </label>
-                    )}
-                </div>
-
-                {/* Slide text */}
-                <div className="relative z-10 mt-10 max-w-lg text-center">
-                    <h2 className="text-3xl font-medium leading-snug">{current.title}</h2>
-                    <p className="mx-auto mt-4 max-w-md text-xs leading-relaxed text-white/80">{current.text}</p>
-                </div>
-
-                {/* Dots */}
-                <div className="relative z-10 mt-8 flex items-center gap-1.5">
-                    {SLIDES.map((_, i) => (
-                        <button
-                            key={i}
-                            onClick={() => setSlide(i)}
-                            aria-label={`Go to slide ${i + 1}`}
-                            className={`h-1 rounded-full transition-all ${i === slide ? "w-6 bg-white" : "w-3 bg-white/50 hover:bg-white/70"}`}
-                        />
-                    ))}
-                </div>
-            </aside>
+  return (
+    <div className="min-h-screen w-full bg-white flex flex-col lg:flex-row antialiased font-sans">
+      {/* ── LEFT: Form ── */}
+      <div className="w-full lg:w-1/2 flex flex-col justify-between p-6 sm:p-12 lg:p-16 xl:p-24 max-w-2xl mx-auto lg:mx-0">
+        {/* Logo */}
+        <div>
+          <div className="inline-flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#1d68ff] flex items-center justify-center text-white font-extrabold shadow-sm">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xl font-black tracking-tight text-neutral-900 leading-none">
+                Glo<span className="text-[#1d68ff]">Pharm</span>
+              </span>
+              <span className="text-[10px] text-neutral-400 font-semibold tracking-wider uppercase mt-0.5">
+                Admin Dashboard
+              </span>
+            </div>
+          </div>
         </div>
-    );
+
+        {/* Form */}
+        <div className="my-8 sm:my-12">
+          <div className="mb-8">
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
+              Admin Sign In
+            </h1>
+            <p className="text-sm text-neutral-500 mt-2">
+              Sign in to manage products, orders, prescriptions and more.
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200/80 text-red-700 text-xs sm:text-sm flex items-start gap-3">
+              <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+              </svg>
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Email */}
+            <div>
+              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">
+                Email Address
+              </label>
+              <div className="relative flex items-center">
+                <div className="absolute left-4 text-neutral-400 pointer-events-none">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                  </svg>
+                </div>
+                <input
+                  type="email"
+                  required
+                  placeholder="admin@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-2xl border border-neutral-200 bg-[#FBFBFA] pl-11 pr-4 py-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:border-[#1d68ff] focus:ring-2 focus:ring-[#1d68ff]/15 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">
+                Password
+              </label>
+              <div className="relative flex items-center">
+                <div className="absolute left-4 text-neutral-400 pointer-events-none">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                  </svg>
+                </div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-2xl border border-neutral-200 bg-[#FBFBFA] pl-11 pr-12 py-3.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:border-[#1d68ff] focus:ring-2 focus:ring-[#1d68ff]/15 outline-none transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-4 text-neutral-400 hover:text-neutral-600 transition-colors"
+                >
+                  {showPassword ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit */}
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-4 px-6 rounded-2xl bg-[#1d68ff] hover:bg-[#1656d6] text-white font-bold text-sm shadow-lg shadow-[#1d68ff]/25 hover:shadow-xl active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In to Dashboard</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                    </svg>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          <p className="mt-6 text-center text-xs text-neutral-400">
+            Not an admin?{" "}
+            <a href="/login" className="font-bold text-[#00A654] hover:underline">
+              Go to patient portal
+            </a>
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="pt-6 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-400 gap-2">
+          <span>&copy; 2026 GloPharm Ltd. All rights reserved.</span>
+        </div>
+      </div>
+
+      {/* ── RIGHT: Brand panel ── */}
+      <div className="hidden lg:flex w-1/2 bg-[#EEF4FF] border-l border-blue-100 flex-col justify-between p-12 xl:p-16 relative overflow-hidden select-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[580px] h-[580px] bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex items-center justify-between z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/90 border border-blue-100 shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-[#1d68ff] animate-pulse" />
+            <span className="text-xs font-bold text-neutral-800 tracking-tight">Admin Access Only</span>
+          </div>
+        </div>
+
+        <div className="relative my-auto flex items-center justify-center py-8 z-10">
+          <div className="max-w-md w-full space-y-4">
+            {[
+              { icon: "📦", label: "Manage Products", desc: "Create, edit and remove catalogue items" },
+              { icon: "🧾", label: "Review Orders", desc: "Track and fulfil patient orders in real time" },
+              { icon: "💊", label: "Prescriptions", desc: "Review uploaded patient prescriptions" },
+              { icon: "📊", label: "Analytics", desc: "Sales stats and inventory insights" },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center gap-4 bg-white/80 backdrop-blur rounded-2xl p-4 border border-blue-50 shadow-sm">
+                <span className="text-2xl">{item.icon}</span>
+                <div>
+                  <p className="text-sm font-bold text-neutral-900">{item.label}</p>
+                  <p className="text-xs text-neutral-500 mt-0.5">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="z-10 bg-white/90 backdrop-blur-md rounded-3xl p-6 border border-blue-100 shadow-sm text-center">
+          <h2 className="text-xl font-extrabold text-neutral-900 tracking-tight">
+            GloPharm Admin Dashboard
+          </h2>
+          <p className="text-xs text-neutral-500 mt-1">
+            Restricted access — staff with <code className="bg-blue-50 px-1 rounded text-[#1d68ff]">is_staff</code> permission only.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }

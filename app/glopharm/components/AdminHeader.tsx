@@ -21,6 +21,14 @@ export default function AdminHeader({
   const [messagesOpen, setMessagesOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/gload/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/glopharm/login";
+    }
+  };
+
   return (
     <>
       {/* ── MOBILE TOP BAR ── */}
@@ -51,6 +59,18 @@ export default function AdminHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="p-2 rounded-xl text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+            title="Log out"
+            aria-label="Log out"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+            </svg>
+          </button>
+
           <button
             type="button"
             onClick={() => setMobileMenuOpen(true)}
@@ -177,6 +197,19 @@ export default function AdminHeader({
               <div className="text-[10px] text-[#888888] font-normal">Admin</div>
             </div>
           </div>
+
+          {/* Quick Logout Button */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-red-600 border border-red-200 hover:bg-red-50 hover:border-red-300 transition-colors cursor-pointer"
+            title="Log out of Admin"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+            </svg>
+            <span className="hidden xl:inline">Logout</span>
+          </button>
         </div>
       </header>
     </>

@@ -101,16 +101,135 @@ function redirectToLogin(request: NextRequest, targetUrl: string): NextResponse 
   return redirect;
 }
 
+function redirectToAdminLogin(request: NextRequest, targetUrl?: string): NextResponse {
+  const loginUrl = new URL("/glopharm/login", request.url);
+  if (targetUrl && targetUrl !== "/glopharm" && targetUrl !== "/glopharm/") {
+    loginUrl.searchParams.set("callback", targetUrl);
+  }
+  const redirect = NextResponse.redirect(loginUrl);
+  redirect.cookies.delete("adminAccessToken");
+  redirect.cookies.delete("adminRefreshToken");
+  redirect.cookies.delete("adminUser");
+  return redirect;
+}
+
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 1. ADMIN ROUTES (/glopharm and /glopharm/*)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (pathname.startsWith("/glopharm")) {
+    const adminAccessToken = request.cookies.get("adminAccessToken")?.value;
+    const adminRefreshToken = request.cookies.get("adminRefreshToken")?.value;
+
+    // Login page
+    if (pathname === "/glopharm/login") {
+      if (adminAccessToken && !isExpired(adminAccessToken)) {
+        return NextResponse.redirect(new URL("/glopharm", request.url));
+      }
+      return NextResponse.next();
+    }
+
+    // Valid admin access token
+    if (adminAccessToken && !isExpired(adminAccessToken)) {
+      return NextResponse.next();
+    }
+
+    const targetUrl = getTargetUrl(request);
+
+    // Expired or missing access token — check refresh token
+    if (adminRefreshToken) {
+      if (isExpired(adminRefreshToken, 0)) {
+        return redirectToAdminLogin(request, targetUrl);
+      }
+
+      const tokens = await refreshTokens(adminRefreshToken);
+      if (tokens) {
+        const response = NextResponse.next();
+        setCookieOnResponse(response, "adminAccessToken", tokens.access, 60 * 15);
+        setCookieOnResponse(response, "adminRefreshToken", tokens.refresh, 60 * 60 * 24 * 7);
+        return response;
+      }
+
+      // Refresh failed (invalid, expired, or revoked on backend)
+      return redirectToAdminLogin(request, targetUrl);
+    }
+
+    // No admin tokens at all
+    return redirectToAdminLogin(request, targetUrl);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 2. ADMIN API ROUTES (/api/gload/*)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (pathname.startsWith("/api/gload/")) {
+    // Exclude public/auth routes like login
+    if (pathname.startsWith("/api/gload/auth/login")) {
+      return NextResponse.next();
+    }
+
+    const adminAccessToken = request.cookies.get("adminAccessToken")?.value;
+    const adminRefreshToken = request.cookies.get("adminRefreshToken")?.value;
+
+    if (adminAccessToken && !isExpired(adminAccessToken)) {
+      return NextResponse.next();
+    }
+
+    if (adminRefreshToken) {
+      if (isExpired(adminRefreshToken, 0)) {
+        const res = NextResponse.json(
+          { status_code: 401, message: "Admin session expired. Please log in again.", data: null },
+          { status: 401 }
+        );
+        res.cookies.delete("adminAccessToken");
+        res.cookies.delete("adminRefreshToken");
+        res.cookies.delete("adminUser");
+        return res;
+      }
+
+      const tokens = await refreshTokens(adminRefreshToken);
+      if (tokens) {
+        const response = NextResponse.next();
+        setCookieOnResponse(response, "adminAccessToken", tokens.access, 60 * 15);
+        setCookieOnResponse(response, "adminRefreshToken", tokens.refresh, 60 * 60 * 24 * 7);
+        return response;
+      }
+
+      const res = NextResponse.json(
+        { status_code: 401, message: "Invalid or expired admin refresh token.", data: null },
+        { status: 401 }
+      );
+      res.cookies.delete("adminAccessToken");
+      res.cookies.delete("adminRefreshToken");
+      res.cookies.delete("adminUser");
+      return res;
+    }
+
+    const res = NextResponse.json(
+      { status_code: 401, message: "Admin authentication required.", data: null },
+      { status: 401 }
+    );
+    res.cookies.delete("adminAccessToken");
+    res.cookies.delete("adminRefreshToken");
+    res.cookies.delete("adminUser");
+    return res;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 3. USER ROUTES (/account, /login, /api/ecommerce/*)
+  // ═══════════════════════════════════════════════════════════════════════════
   const isProtected = pathname === "/account" || pathname.startsWith("/account/");
+  const isProtectedApi =
+    pathname.startsWith("/api/auth/profile") ||
+    pathname.startsWith("/api/referrals");
 
   const accessToken = request.cookies.get("accessToken")?.value;
   const refreshToken = request.cookies.get("refreshToken")?.value;
 
-  // ── Case 0: Visiting /login while already authenticated ───────────────────
+  // Visiting /login while already authenticated
   if (pathname === "/login") {
     const rawCallback =
       request.nextUrl.searchParams.get("callback") ||
@@ -126,17 +245,26 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ── Case 1: Token is valid and not near expiry ────────────────────────────
+  // Token is valid and not near expiry
   if (accessToken && !isExpired(accessToken)) {
     return NextResponse.next();
   }
 
   const targetUrl = getTargetUrl(request);
 
-  // ── Case 2: Access token missing or expired — try to refresh with refreshToken ──
+  // Access token missing or expired — try to refresh with refreshToken
   if (refreshToken) {
-    // If refreshToken itself is expired, do not attempt refresh; send to login immediately
     if (isExpired(refreshToken, 0)) {
+      if (isProtectedApi) {
+        const res = NextResponse.json(
+          { status_code: 401, message: "Session expired. Please log in again.", data: null },
+          { status: 401 }
+        );
+        res.cookies.delete("accessToken");
+        res.cookies.delete("refreshToken");
+        res.cookies.delete("user");
+        return res;
+      }
       if (isProtected) {
         return redirectToLogin(request, targetUrl);
       }
@@ -150,22 +278,27 @@ export async function middleware(request: NextRequest) {
     const tokens = await refreshTokens(refreshToken);
 
     if (tokens) {
-      // Successfully refreshed: clone request with updated cookies and continue
       const response = NextResponse.next();
-
-      // Write fresh tokens into response cookies so browser and subsequent route handlers see them
-      setCookieOnResponse(response, "accessToken", tokens.access, 60 * 15);         // 15 min
-      setCookieOnResponse(response, "refreshToken", tokens.refresh, 60 * 60 * 24 * 7); // 7 days
-
+      setCookieOnResponse(response, "accessToken", tokens.access, 60 * 15);
+      setCookieOnResponse(response, "refreshToken", tokens.refresh, 60 * 60 * 24 * 7);
       return response;
     }
 
     // Refresh failed (refresh token expired on backend / invalid / revoked)
+    if (isProtectedApi) {
+      const res = NextResponse.json(
+        { status_code: 401, message: "Invalid or expired session. Please log in again.", data: null },
+        { status: 401 }
+      );
+      res.cookies.delete("accessToken");
+      res.cookies.delete("refreshToken");
+      res.cookies.delete("user");
+      return res;
+    }
     if (isProtected) {
       return redirectToLogin(request, targetUrl);
     }
 
-    // For non-protected routes just clear and continue as guest
     const response = NextResponse.next();
     response.cookies.delete("accessToken");
     response.cookies.delete("refreshToken");
@@ -173,7 +306,17 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // ── Case 3: No tokens at all ─────────────────────────────────────────────
+  // No tokens at all
+  if (isProtectedApi) {
+    const res = NextResponse.json(
+      { status_code: 401, message: "Authentication required.", data: null },
+      { status: 401 }
+    );
+    res.cookies.delete("accessToken");
+    res.cookies.delete("refreshToken");
+    res.cookies.delete("user");
+    return res;
+  }
   if (isProtected) {
     return redirectToLogin(request, targetUrl);
   }
@@ -182,12 +325,18 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Run on /account pages, /login, AND all API routes that need auth
+  // Run on /account pages, /glopharm pages, /login, and protected APIs
   matcher: [
     "/account",
     "/account/:path*",
     "/login",
+    "/glopharm",
+    "/glopharm/:path*",
+    "/api/gload/:path*",
     "/api/ecommerce/checkout",
     "/api/ecommerce/orders",
+    "/api/auth/profile",
+    "/api/auth/profile/:path*",
+    "/api/referrals/:path*",
   ],
 };

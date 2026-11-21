@@ -78,19 +78,17 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen w-full bg-white flex flex-col lg:flex-row antialiased font-sans selection:bg-[#00A654] selection:text-white">
-      {/* ── LEFT COLUMN: LOGIN FORM (Matches Reference Layout) ── */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-between p-6 sm:p-12 lg:p-16 xl:p-24 max-w-2xl mx-auto lg:mx-0">
+      {/* ── LEFT COLUMN: LOGIN FORM ── */}
+      <div className="w-full lg:w-1/2 min-h-screen flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16">
         {/* Top: Logo */}
-        <div>
+        <div className="w-full max-w-md mx-auto">
           <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-[#00A654] flex items-center justify-center text-white font-extrabold shadow-sm group-hover:bg-[#008f48] transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
+            <div className="w-9 h-9 rounded-xl overflow-hidden border border-green-100 shadow-sm">
+              <img src="/images/logo.jpg" alt="Buckksrob" className="w-full h-full object-cover" />
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-black tracking-tight text-neutral-900 leading-none">
-                Glo<span className="text-[#00A654]">Pharm</span>
+                Buckksrob
               </span>
               <span className="text-[10px] text-neutral-400 font-semibold tracking-wider uppercase mt-0.5">
                 Health &amp; Groceries
@@ -100,7 +98,7 @@ function LoginForm() {
         </div>
 
         {/* Middle: Main Form */}
-        <div className="my-8 sm:my-12">
+        <div className="w-full max-w-md mx-auto my-auto py-8">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
@@ -235,7 +233,7 @@ function LoginForm() {
 
           {/* Sign Up Redirect */}
           <div className="mt-6 text-center text-xs sm:text-sm text-neutral-500">
-            Don&apos;t have a GloPharm account yet?{" "}
+            Don&apos;t have a Buckksrob account yet?{" "}
             <Link
               href="/register"
               className="font-bold text-[#00A654] hover:text-[#008f48] underline underline-offset-4 decoration-2 transition-colors"
@@ -246,8 +244,8 @@ function LoginForm() {
         </div>
 
         {/* Footer info */}
-        <div className="pt-6 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-400 gap-2">
-          <span>&copy; 2026 GloPharm Ltd. All rights reserved.</span>
+        <div className="w-full max-w-md mx-auto pt-6 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-400 gap-2">
+          <span>&copy; 2026 Buckksrob Pharmacy and Supermarket. All rights reserved.</span>
           <div className="flex items-center gap-4">
             <Link href="/" className="hover:text-neutral-700 transition-colors">Privacy</Link>
             <Link href="/" className="hover:text-neutral-700 transition-colors">Terms</Link>
@@ -309,7 +307,7 @@ function LoginForm() {
               GP
             </div>
             <div>
-              <p className="text-xs font-bold text-neutral-900">GloPharm Certified</p>
+              <p className="text-xs font-bold text-neutral-900">Buckksrob Certified</p>
               <p className="text-[10px] text-neutral-500">Fast cold-chain delivery</p>
             </div>
           </div>

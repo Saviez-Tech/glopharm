@@ -6,8 +6,13 @@ const geistSans = { variable: "font-sans" };
 const geistMono = { variable: "font-mono" };
 
 export const metadata: Metadata = {
-  title: "GloPharm - Admin & Health Store",
-  description: "GloPharm Healthcare & Management Platform",
+  title: "Buckksrob Pharmacy and Supermarket",
+  description: "Buckksrob Pharmacy and Supermarket — Nigeria's trusted pharmacy, groceries & healthcare platform.",
+  icons: {
+    icon: "/images/logo.jpg",
+    shortcut: "/images/logo.jpg",
+    apple: "/images/logo.jpg",
+  },
 };
 
 export default function RootLayout({

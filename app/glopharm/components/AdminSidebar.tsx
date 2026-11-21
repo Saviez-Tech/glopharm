@@ -12,7 +12,6 @@ export const ADMIN_ROUTES = {
   addProduct: `${BASE}/products/new`,
   orders: `${BASE}/orders`,
   labTests: `${BASE}/prescription`,
-  promoCodes: `${BASE}/promo`,
   settings: `${BASE}/settings`,
   changePassword: `${BASE}/settings/password`,
 } as const;
@@ -134,14 +133,11 @@ export default function AdminSidebar({
         <div className="p-5">
           <div className={`flex items-center ${sidebarCollapsed ? "flex-col gap-3" : "justify-between"}`}>
             <Link href={ADMIN_ROUTES.dashboard} onClick={closeMobile} className="flex items-center gap-3 overflow-hidden">
-              <div className="relative flex h-7 w-7 flex-shrink-0 items-center justify-center">
-                <svg viewBox="0 0 40 40" className="h-7 w-7" fill="none">
-                  <path d="M19.5 4L36 33.5H19.5L11.5 19L19.5 4Z" fill="#1d68ff" />
-                  <path d="M4 33.5L12 19L20 33.5H4Z" fill="#84cc16" />
-                </svg>
+              <div className="relative flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg overflow-hidden">
+                <img src="/images/logo.jpg" alt="Buckksrob" className="h-7 w-7 object-cover" />
               </div>
               {!sidebarCollapsed && (
-                <span className="text-xl font-bold leading-none tracking-tight text-[#282828]">Culters</span>
+                <span className="text-xl font-bold leading-none tracking-tight text-[#282828]">Buckksrob</span>
               )}
             </Link>
 
@@ -173,13 +169,12 @@ export default function AdminSidebar({
           {/* Store Switcher Card */}
           {!sidebarCollapsed && (
             <div className="mt-5 flex items-center gap-3 rounded-xl border border-[#E8E8E8] bg-[#FFFFFF] p-2.5">
-              <div className="flex h-8 w-8 flex-shrink-0 flex-col items-center justify-center rounded-lg border border-red-500/20 bg-red-500/10 text-[8px] font-bold leading-tight text-red-600">
-                <span className="text-[6px] tracking-tighter">OK.</span>
-                <span>KANKY</span>
+              <div className="flex h-8 w-8 flex-shrink-0 rounded-lg overflow-hidden border border-[#E8E8E8]">
+                <img src="/images/logo.jpg" alt="Buckksrob" className="h-full w-full object-cover" />
               </div>
               <div className="overflow-hidden">
                 <div className="text-[9px] font-semibold uppercase tracking-wider text-[#888888]">Company</div>
-                <div className="truncate text-xs font-bold text-[#282828]">Kanky Store</div>
+                <div className="truncate text-xs font-bold text-[#282828]">Buckksrob Pharmacy</div>
               </div>
             </div>
           )}
@@ -195,7 +190,6 @@ export default function AdminSidebar({
               {navLink(ADMIN_ROUTES.products, "product", `Product (${PRODUCT_COUNT})`, pathname.startsWith(ADMIN_ROUTES.products))}
               {navLink(ADMIN_ROUTES.orders, "orders", `Orders (${ORDER_COUNT})`, pathname.startsWith(ADMIN_ROUTES.orders))}
               {navLink(ADMIN_ROUTES.labTests, "lab", "Lab Tests", pathname.startsWith(ADMIN_ROUTES.labTests))}
-              {navLink(ADMIN_ROUTES.promoCodes, "tag", "Promo Codes", pathname.startsWith(ADMIN_ROUTES.promoCodes))}
             </nav>
           </div>
 

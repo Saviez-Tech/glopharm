@@ -105,7 +105,7 @@ export default function AboutPage() {
             </h1>
 
             <p className="mt-5 text-gray-600 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
-              GloPharm is Nigeria&apos;s unified healthcare and essential groceries platform. We bring together fresh farm produce, certified pharmacy medications, and instant doctor consultations under one digital roof.
+              Buckksrob Pharmacy and Supermarket is Nigeria&apos;s unified healthcare and essential groceries platform. We bring together fresh farm produce, certified pharmacy medications, and instant doctor consultations under one digital roof.
             </p>
           </div>
         </section>
@@ -140,7 +140,7 @@ export default function AboutPage() {
                   In Nigeria, families have historically faced two major daily headaches: navigating chaotic open markets to buy fresh, safe food, and rushing between pharmacies trying to find genuine, unadulterated medications.
                 </p>
                 <p>
-                  GloPharm was established to solve both challenges in one unified experience. By integrating local farm partnerships with licensed pharmaceutical warehouses, we ensure your refrigerator has nutritious food while your medicine cabinet has 100% verified authentic healthcare.
+                  Buckksrob was established to solve both challenges in one unified experience. By integrating local farm partnerships with licensed pharmaceutical warehouses, we ensure your refrigerator has nutritious food while your medicine cabinet has 100% verified authentic healthcare.
                 </p>
                 <p>
                   With our digital lab-review feature, patients no longer have to spend entire mornings in crowded clinics just to have a routine malaria or typhoid panel interpreted. Our team reviews test results online and sends the exact prescribed medicines to your door.
@@ -169,7 +169,7 @@ export default function AboutPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&auto=format&fit=crop&q=80"
-                  alt="GloPharm Quality Healthcare and Nutrition"
+                  alt="Buckksrob Quality Healthcare and Nutrition"
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -196,7 +196,7 @@ export default function AboutPage() {
                 Our Guiding Pillars
               </span>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 mt-2 tracking-tight">
-                What Sets GloPharm Apart
+                What Sets Buckksrob Apart
               </h2>
               <p className="text-sm text-gray-500 mt-3">
                 Built on strict safety standards, trusted medical expertise, and uncompromising customer care.

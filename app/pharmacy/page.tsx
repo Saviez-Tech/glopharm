@@ -71,7 +71,7 @@ export default function PharmacyPage() {
     {
       step: "02",
       title: "Upload Document or Picture",
-      desc: "Take a clear photo with your phone or upload the PDF document directly into your GloPharm account.",
+      desc: "Take a clear photo with your phone or upload the PDF document directly into your Buckksrob account.",
       detail:
         "Our high-security health vault encrypts your data. You can also note down any symptoms you are feeling (e.g. fever for 3 days, headaches, fatigue) to give the doctor complete clinical context.",
     },
@@ -159,7 +159,7 @@ export default function PharmacyPage() {
                 Browse Medicines
               </Link>
               <a
-                href="https://wa.me/2348012345678"
+                href="https://wa.me/2348169728780"
                 target="_blank"
                 rel="noreferrer"
                 className="px-5 py-3.5 bg-green-50 text-green-800 border border-green-200 text-xs font-bold rounded-xl hover:bg-green-100 transition flex items-center gap-2"

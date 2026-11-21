@@ -135,7 +135,7 @@ function printReceipt(o: BackendOrder) {
   .sum{margin:20px 0 0 auto;width:280px} .sum div{display:flex;justify-content:space-between;padding:4px 0}
   .total{font-weight:bold;border-top:1px solid #111;padding-top:8px;margin-top:4px}
 </style></head><body>
-  <h2>GloPharm Order #${esc(o.order_number)}</h2>
+  <h2>Buckksrob Order #${esc(o.order_number)}</h2>
   <p>Customer: ${esc(o.customer?.name || "Guest")} (${esc(o.customer?.email || "")}) · ${formatDate(o.created_at)} · Status: <b>${esc(o.status_label)}</b></p>
   <p>Delivery Address: ${esc(o.shipping?.address || "")}, ${esc(o.shipping?.city || "")}, ${esc(o.shipping?.state || "")}</p>
   <table><thead><tr><th>#</th><th>Product</th><th>Unit Price</th><th>Qty</th><th>Line Total</th></tr></thead><tbody>${rows}</tbody></table>
@@ -178,7 +178,9 @@ export default function AdminOrdersPage() {
 
   const [stats, setStats] = useState<OrderStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState("");
   const [period, setPeriod] = useState<"today" | "this_month" | "this_year">("today");
+  const [selectedDate, setSelectedDate] = useState("");
 
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
   const [page, setPage] = useState(1);
@@ -197,71 +199,108 @@ export default function AdminOrdersPage() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   /* ── Fetch Stats ── */
-  const fetchStats = useCallback(async () => {
-    setStatsLoading(true);
-    try {
-      const res = await fetch(`/api/gload/orders/stats?period=${period}`);
-      if (res.status === 401) {
-        window.location.href = "/glopharm/login?session_expired=1";
-        return;
+  const fetchStats = useCallback(
+    async (dateVal = selectedDate, periodVal = period) => {
+      setStatsLoading(true);
+      setStatsError("");
+      try {
+        const url = dateVal
+          ? `/api/gload/orders/stats?date=${encodeURIComponent(dateVal)}`
+          : `/api/gload/orders/stats?period=${encodeURIComponent(periodVal)}`;
+        const res = await fetch(url);
+        if (res.status === 401) {
+          window.location.href = "/glopharm/login?session_expired=1";
+          return;
+        }
+        const json = await res.json();
+        if (!res.ok) {
+          setStatsError(json?.message || "Failed to load order stats.");
+          return;
+        }
+        if (json.data) {
+          setStats(json.data as OrderStats);
+        }
+      } catch (err: unknown) {
+        setStatsError(err instanceof Error ? err.message : "Unable to load stats.");
+      } finally {
+        setStatsLoading(false);
       }
-      const json = await res.json();
-      if (res.ok && json.data) {
-        setStats(json.data as OrderStats);
-      }
-    } catch {
-      // stats error fallback
-    } finally {
-      setStatsLoading(false);
-    }
-  }, [period]);
+    },
+    [selectedDate, period]
+  );
 
   /* ── Fetch Orders List ── */
-  const fetchOrders = useCallback(async (p = page, q = search, status = activeTab) => {
-    setLoading(true);
-    setError("");
-    try {
-      const params = new URLSearchParams({
-        page: String(p),
-        page_size: "20",
-        _t: String(Date.now()),
-      });
+  const fetchOrders = useCallback(
+    async (p = page, q = search, status = activeTab, dateVal = selectedDate) => {
+      setLoading(true);
+      setError("");
+      try {
+        const params = new URLSearchParams({
+          page: String(p),
+          page_size: "20",
+          _t: String(Date.now()),
+        });
 
-      if (q.trim()) params.set("search", q.trim());
-      if (status !== "all") params.set("status", status);
+        if (dateVal) params.set("date", dateVal);
+        if (q.trim()) params.set("search", q.trim());
+        if (status !== "all") params.set("status", status);
 
-      const res = await fetch(`/api/gload/orders?${params.toString()}`, { cache: "no-store" });
-      if (res.status === 401) {
-        window.location.href = "/glopharm/login?session_expired=1";
-        return;
+        const res = await fetch(`/api/gload/orders?${params.toString()}`, { cache: "no-store" });
+        if (res.status === 401) {
+          window.location.href = "/glopharm/login?session_expired=1";
+          return;
+        }
+        const json = await res.json();
+
+        if (!res.ok) {
+          setError(json.message || "Failed to load orders.");
+          return;
+        }
+
+        const results = json.data?.results ?? (Array.isArray(json.data) ? json.data : []);
+        setOrders(results);
+        setTotalCount(json.data?.count ?? results.length);
+        setHasNext(Boolean(json.data?.next));
+        setHasPrev(Boolean(json.data?.previous));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Unable to load orders.";
+        setError(msg);
+      } finally {
+        setLoading(false);
       }
-      const json = await res.json();
-
-      if (!res.ok) {
-        setError(json.message || "Failed to load orders.");
-        return;
-      }
-
-      const results = json.data?.results ?? (Array.isArray(json.data) ? json.data : []);
-      setOrders(results);
-      setTotalCount(json.data?.count ?? results.length);
-      setHasNext(Boolean(json.data?.next));
-      setHasPrev(Boolean(json.data?.previous));
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Unable to load orders.";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search, activeTab]);
+    },
+    [page, search, activeTab, selectedDate]
+  );
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    fetchStats(selectedDate, period);
+  }, [fetchStats, selectedDate, period]);
 
   useEffect(() => {
-    fetchOrders(page, search, activeTab);
-  }, [fetchOrders, page, search, activeTab]);
+    fetchOrders(page, search, activeTab, selectedDate);
+  }, [fetchOrders, page, search, activeTab, selectedDate]);
+
+  const handleDateChange = (dateVal: string) => {
+    setSelectedDate(dateVal); // Date replaces period filter
+    setPage(1);
+    fetchStats(dateVal, period);
+    fetchOrders(1, search, activeTab, dateVal);
+  };
+
+  const handleClearDate = () => {
+    setSelectedDate(""); // Cleared date reverts to active period
+    setPage(1);
+    fetchStats("", period);
+    fetchOrders(1, search, activeTab, "");
+  };
+
+  const handlePeriodChange = (newPeriod: typeof period) => {
+    setSelectedDate(""); // Changing period clears date filter
+    setPeriod(newPeriod);
+    setPage(1);
+    fetchStats("", newPeriod);
+    fetchOrders(1, search, activeTab, "");
+  };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -441,19 +480,47 @@ export default function AdminOrdersPage() {
           </nav>
         </div>
 
-        {/* Period filter for stats */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className={textCls}>Period:</span>
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as typeof period)}
-            className={`px-3 py-1.5 rounded-xl border text-xs outline-none font-medium cursor-pointer ${darkMode ? "bg-[#505050] border-[#666] text-white" : "bg-white border-[#E8E8E8] text-[#282828]"
-              }`}
-          >
-            <option value="today">Today</option>
-            <option value="this_month">This Month</option>
-            <option value="this_year">This Year</option>
-          </select>
+        {/* Date & Period filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Specific Date input */}
+          <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-xl border border-gray-200 text-xs">
+            <label htmlFor="orders-date-picker" className="text-[11px] font-medium text-gray-500">
+              Date:
+            </label>
+            <input
+              id="orders-date-picker"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="text-xs bg-transparent text-gray-700 outline-none cursor-pointer"
+            />
+            {selectedDate && (
+              <button
+                type="button"
+                onClick={handleClearDate}
+                className="text-[10px] font-bold text-red-500 hover:text-red-700 cursor-pointer ml-1.5"
+                title="Clear date and return to period"
+              >
+                ✕ Clear
+              </button>
+            )}
+          </div>
+
+          {/* Period filter dropdown - active when no specific date is picked */}
+          <div className={`flex items-center gap-2 text-xs transition-opacity ${selectedDate ? "opacity-50" : "opacity-100"}`}>
+            <span className={textCls}>Period:</span>
+            <select
+              value={selectedDate ? "" : period}
+              onChange={(e) => handlePeriodChange(e.target.value as typeof period)}
+              className={`px-3 py-1.5 rounded-xl border text-xs outline-none font-medium cursor-pointer ${darkMode ? "bg-[#505050] border-[#666] text-white" : "bg-white border-[#E8E8E8] text-[#282828]"
+                }`}
+            >
+              {selectedDate && <option value="" disabled>Custom Date Active</option>}
+              <option value="today">Today</option>
+              <option value="this_month">This Month</option>
+              <option value="this_year">This Year</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -463,12 +530,18 @@ export default function AdminOrdersPage() {
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className={`rounded-2xl border p-5 animate-pulse h-28 ${cardCls}`} />
           ))
+        ) : statsError ? (
+          <div className="col-span-full rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800">
+            {statsError}
+          </div>
         ) : stats ? (
           <>
             <div className="rounded-2xl p-5 shadow-sm bg-[#1d68ff] text-white">
               <p className="text-sm font-semibold">
                 Total Orders (
-                {stats.period?.filter === "this_month"
+                {selectedDate
+                  ? selectedDate
+                  : stats.period?.filter === "this_month"
                   ? "This Month"
                   : stats.period?.filter === "this_year"
                   ? "This Year"
@@ -476,7 +549,9 @@ export default function AdminOrdersPage() {
                 )
               </p>
               <p className="mt-3 text-3xl font-bold">{stats.total_orders}</p>
-              <p className="mt-1 text-[11px] text-white/80">Date: {stats.period.value}</p>
+              <p className="mt-1 text-[11px] text-white/80">
+                Date: {selectedDate || stats.period?.value || "Active"}
+              </p>
             </div>
             <div className={`rounded-2xl border p-5 shadow-sm ${cardCls}`}>
               <p className="text-sm font-semibold text-gray-500">Total Sold</p>
@@ -521,8 +596,8 @@ export default function AdminOrdersPage() {
 
           <button
             onClick={() => {
-              fetchStats();
-              fetchOrders(page, search, activeTab);
+              fetchStats(selectedDate, period);
+              fetchOrders(page, search, activeTab, selectedDate);
               toast("Orders refreshed!");
             }}
             className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"

@@ -200,7 +200,7 @@ export default function ReferralsPage() {
             Referrals &amp; Reward Points
           </h1>
           <p className="text-xs sm:text-sm text-neutral-500 mt-1">
-            Invite friends to GloPharm and earn points on every referral and purchase you make.
+            Invite friends to Buckksrob and earn points on every referral and purchase you make.
           </p>
         </div>
         <button

@@ -154,13 +154,19 @@ function SalesTarget({ totalRevenue }: { totalRevenue: number }) {
 function RevenueChartCard({
   chartData,
   chartRange,
+  chartDate,
   onRangeChange,
+  onDateChange,
   loading,
+  error,
 }: {
   chartData: RevenueChartData | null;
   chartRange: string;
+  chartDate: string;
   onRangeChange: (r: string) => void;
+  onDateChange: (d: string) => void;
   loading: boolean;
+  error?: string;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const points = chartData?.points || [];
@@ -177,7 +183,11 @@ function RevenueChartCard({
 
   const pts: [number, number][] = useMemo(() => {
     if (!points.length) return [];
-    if (points.length === 1) return [[0, H - 20], [W, H - 20]];
+    if (points.length === 1) {
+      const rev = parseFloat(points[0].revenue || "0");
+      const y = maxRevenue > 0 ? H - 16 - (rev / maxRevenue) * (H - 32) : H - 20;
+      return [[0, y], [W, y]];
+    }
     return points.map((p, i) => {
       const rev = parseFloat(p.revenue || "0");
       const x = (i / (points.length - 1)) * W;
@@ -207,30 +217,60 @@ function RevenueChartCard({
           <h3 className="text-sm font-semibold leading-snug text-gray-800">Revenue Performance</h3>
           <p className="text-[11px] text-gray-500 mt-0.5">
             Total in period: <span className="font-bold text-[#1d68ff]">{CURRENCY}{fmtMoney(chartData?.total_revenue || 0)}</span> &bull; {chartData?.total_transactions || 0} transactions
+            {chartDate && (
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                Filtered: {chartDate}
+              </span>
+            )}
           </p>
         </div>
 
-        {/* Range filter buttons */}
-        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-[11px] font-semibold">
-          {[
-            { key: "today", label: "Today" },
-            { key: "week", label: "Week" },
-            { key: "month", label: "Month" },
-            { key: "year", label: "Year" },
-          ].map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              onClick={() => onRangeChange(r.key)}
-              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
-                chartRange === r.key
-                  ? "bg-white text-[#1d68ff] shadow-xs"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
+        {/* Range and Date Filter Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Specific Date input */}
+          <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-xl border border-gray-200 text-xs">
+            <label htmlFor="rev-date-picker" className="text-[11px] font-medium text-gray-500">
+              Date:
+            </label>
+            <input
+              id="rev-date-picker"
+              type="date"
+              value={chartDate}
+              onChange={(e) => onDateChange(e.target.value)}
+              className="text-xs bg-transparent text-gray-700 outline-none cursor-pointer"
+            />
+            {chartDate && (
+              <button
+                type="button"
+                onClick={() => onDateChange("")}
+                className="text-[10px] font-bold text-red-500 hover:text-red-700 cursor-pointer ml-1"
+                title="Clear date and return to range"
+              >
+                ✕ Clear
+              </button>
+            )}
+          </div>
+
+          {/* Range filter buttons - clicking any range automatically replaces/clears the date */}
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-[11px] font-semibold">
+            {[
+              { key: "week", label: "Week" },
+              { key: "month", label: "Month" },
+              { key: "year", label: "Year" },
+            ].map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                onClick={() => onRangeChange(r.key)}
+                className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${!chartDate && chartRange === r.key
+                    ? "bg-white text-[#1d68ff] shadow-xs"
+                    : "text-gray-600 hover:text-gray-900"
+                  }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -244,6 +284,10 @@ function RevenueChartCard({
         {loading ? (
           <div className="flex h-full items-center justify-center text-xs text-gray-400">
             Loading revenue data...
+          </div>
+        ) : error ? (
+          <div className="flex h-full items-center justify-center text-xs text-red-500">
+            {error}
           </div>
         ) : points.length === 0 ? (
           <div className="flex h-full items-center justify-center text-xs text-gray-400">
@@ -447,9 +491,8 @@ function PopularProductsTable({ products, loading }: { products: PopularProduct[
 
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-block rounded-md px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                          isOut ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"
-                        }`}
+                        className={`inline-block rounded-md px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isOut ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"
+                          }`}
                       >
                         {p.status_label || (isOut ? "Out of Stock" : "In Stock")}
                       </span>
@@ -477,8 +520,19 @@ export default function DashboardPage() {
   const [popularLoading, setPopularLoading] = useState(true);
 
   const [chartRange, setChartRange] = useState("week");
+  const [chartDate, setChartDate] = useState("");
   const [chartData, setChartData] = useState<RevenueChartData | null>(null);
   const [chartLoading, setChartLoading] = useState(true);
+  const [chartError, setChartError] = useState("");
+
+  const handleRangeChange = (newRange: string) => {
+    setChartDate(""); // Clear date filter when switching back to a range
+    setChartRange(newRange);
+  };
+
+  const handleDateChange = (newDate: string) => {
+    setChartDate(newDate); // Setting date replaces range filter
+  };
 
   // Fetch Dashboard Stats
   useEffect(() => {
@@ -527,28 +581,36 @@ export default function DashboardPage() {
     loadPopular();
   }, []);
 
-  // Fetch Revenue Chart with Range Filter
+  // Fetch Revenue Chart with Range Filter or Date Filter
   useEffect(() => {
     async function loadChart() {
       setChartLoading(true);
+      setChartError("");
       try {
-        const res = await fetch(`/api/gload/dashboard/revenue-chart?range=${chartRange}`, { cache: "no-store" });
+        const url = chartDate
+          ? `/api/gload/dashboard/revenue-chart?date=${encodeURIComponent(chartDate)}`
+          : `/api/gload/dashboard/revenue-chart?range=${encodeURIComponent(chartRange)}`;
+        const res = await fetch(url, { cache: "no-store" });
         if (res.status === 401) {
           window.location.href = "/glopharm/login?session_expired=1";
           return;
         }
         const json = await res.json();
-        if (res.ok && json.data) {
+        if (!res.ok) {
+          setChartError(json?.message || "Failed to load revenue chart for selected period.");
+          return;
+        }
+        if (json.data) {
           setChartData(json.data as RevenueChartData);
         }
       } catch {
-        // chart error
+        setChartError("Failed to connect to revenue service.");
       } finally {
         setChartLoading(false);
       }
     }
     loadChart();
-  }, [chartRange]);
+  }, [chartRange, chartDate]);
 
   const totalRevNum = parseFloat(stats?.total_revenue?.value || "0") || 0;
 
@@ -557,7 +619,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">Admin Dashboard</h1>
         <p className="mt-0.5 text-xs text-gray-500">
-          Live overview of GloPharm sales, customer orders, and inventory.
+          Live overview of Buckksrob sales, customer orders, and inventory.
         </p>
       </div>
 
@@ -568,8 +630,11 @@ export default function DashboardPage() {
           <RevenueChartCard
             chartData={chartData}
             chartRange={chartRange}
-            onRangeChange={setChartRange}
+            chartDate={chartDate}
+            onRangeChange={handleRangeChange}
+            onDateChange={handleDateChange}
             loading={chartLoading}
+            error={chartError}
           />
         </div>
 
@@ -579,7 +644,7 @@ export default function DashboardPage() {
 
           {/* Quick Actions / Store summary banner */}
           <div className="rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-600 to-blue-700 p-6 text-white shadow-sm">
-            <h3 className="text-xl font-bold">GloPharm Store Operations</h3>
+            <h3 className="text-xl font-bold">Buckksrob Store Operations</h3>
             <p className="mt-1.5 text-xs text-white/80 leading-relaxed">
               Fulfill customer prescription and grocery deliveries, review incoming payments, and keep catalog stock updated.
             </p>

@@ -87,64 +87,29 @@ function RegisterPageInner() {
 
   return (
     <div className="min-h-screen w-full bg-white flex flex-col lg:flex-row antialiased font-sans selection:bg-[#00A654] selection:text-white">
-      {/* ── LEFT COLUMN: REGISTER FORM (Matches Reference Layout) ── */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-between p-6 sm:p-12 lg:p-16 xl:p-20 max-w-2xl mx-auto lg:mx-0">
+      {/* ── LEFT COLUMN: REGISTER FORM ── */}
+      <div className="w-full lg:w-1/2 min-h-screen flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16">
         {/* Top: Logo */}
-        <div>
+        <div className="w-full max-w-lg mx-auto">
           <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-[#00A654] flex items-center justify-center text-white font-extrabold shadow-sm group-hover:bg-[#008f48] transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
+            <div className="w-9 h-9 rounded-xl overflow-hidden border border-green-100 shadow-sm">
+              <img src="/images/logo.jpg" alt="Buckksrob" className="w-full h-full object-cover" />
             </div>
             <span className="text-xl font-black tracking-tight text-neutral-900">
-              Glo<span className="text-[#00A654]">Pharm</span>
+              Buckksrob
             </span>
           </Link>
         </div>
 
         {/* Center: Main Form */}
-        <div className="my-8 lg:my-0">
+        <div className="w-full max-w-lg mx-auto my-auto py-6">
           <div className="mb-6">
             <h1 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
               Create Account
             </h1>
             <p className="text-xs sm:text-sm text-neutral-500 mt-2 font-medium">
-              Join GloPharm for certified healthcare &amp; fresh grocery shopping
+              Join Buckksrob for certified healthcare &amp; fresh grocery shopping
             </p>
-          </div>
-
-          {/* Social Buttons */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <button
-              type="button"
-              className="flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 text-xs sm:text-sm font-bold text-neutral-800 transition-all shadow-2xs cursor-pointer"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17Z" />
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24Z" />
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.42l4.03-3.15Z" />
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z" />
-              </svg>
-              <span>Google</span>
-            </button>
-
-            <button
-              type="button"
-              className="flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 text-xs sm:text-sm font-bold text-neutral-800 transition-all shadow-2xs cursor-pointer"
-            >
-              <svg className="w-4 h-4 text-[#1877F2] fill-current" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-              </svg>
-              <span>Facebook</span>
-            </button>
-          </div>
-
-          <div className="relative flex items-center justify-center my-6">
-            <div className="w-full border-t border-neutral-200" />
-            <span className="bg-white px-3 text-[11px] font-bold text-neutral-400 uppercase tracking-widest absolute">
-              OR
-            </span>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
@@ -290,8 +255,8 @@ function RegisterPageInner() {
           </p>
         </div>
 
-        <p className="text-[11px] text-neutral-400 text-center lg:text-left">
-          &copy; 2026 GloPharm Technologies Ltd. All rights reserved.
+        <p className="w-full max-w-lg mx-auto pt-6 text-[11px] text-neutral-400 text-center lg:text-left border-t border-neutral-100">
+          &copy; 2026 Buckksrob Pharmacy and Supermarket. All rights reserved.
         </p>
       </div>
 
@@ -306,7 +271,7 @@ function RegisterPageInner() {
               <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
               <span className="w-2.5 h-2.5 rounded-full bg-[#00A654]" />
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-              <span className="text-[10px] font-mono text-neutral-400 ml-2">glopharm.ng/register</span>
+              <span className="text-[10px] font-mono text-neutral-400 ml-2">buckksrob.ng/register</span>
             </div>
 
             <div className="w-full h-52 rounded-2xl bg-[#F8F9FA] overflow-hidden flex items-center justify-center p-3">
@@ -326,7 +291,7 @@ function RegisterPageInner() {
             </div>
 
             <p className="text-xs text-neutral-700 font-medium mt-2 leading-relaxed">
-              &quot;Joined GloPharm last month and saved over ₦25,000 on fresh groceries and prescription drugs. The quality is unmatched!&quot;
+              &quot;Joined Buckksrob last month and saved over ₦25,000 on fresh groceries and prescription drugs. The quality is unmatched!&quot;
             </p>
 
             <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between text-[11px]">

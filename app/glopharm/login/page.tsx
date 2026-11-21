@@ -63,18 +63,16 @@ export default function AdminLoginPage() {
   return (
     <div className="min-h-screen w-full bg-white flex flex-col lg:flex-row antialiased font-sans">
       {/* ── LEFT: Form ── */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-between p-6 sm:p-12 lg:p-16 xl:p-24 max-w-2xl mx-auto lg:mx-0">
+      <div className="w-full lg:w-1/2 min-h-screen flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16">
         {/* Logo */}
-        <div>
+        <div className="w-full max-w-md mx-auto">
           <div className="inline-flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#1d68ff] flex items-center justify-center text-white font-extrabold shadow-sm">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
+            <div className="w-9 h-9 rounded-xl overflow-hidden border border-blue-100 shadow-sm">
+              <img src="/images/logo.jpg" alt="Buckksrob" className="w-full h-full object-cover" />
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-black tracking-tight text-neutral-900 leading-none">
-                Glo<span className="text-[#1d68ff]">Pharm</span>
+                Buckksrob
               </span>
               <span className="text-[10px] text-neutral-400 font-semibold tracking-wider uppercase mt-0.5">
                 Admin Dashboard
@@ -84,7 +82,7 @@ export default function AdminLoginPage() {
         </div>
 
         {/* Form */}
-        <div className="my-8 sm:my-12">
+        <div className="w-full max-w-md mx-auto my-auto py-8">
           <div className="mb-8">
             <h1 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
               Admin Sign In
@@ -201,8 +199,8 @@ export default function AdminLoginPage() {
         </div>
 
         {/* Footer */}
-        <div className="pt-6 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-400 gap-2">
-          <span>&copy; 2026 GloPharm Ltd. All rights reserved.</span>
+        <div className="w-full max-w-md mx-auto pt-6 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-400 gap-2">
+          <span>&copy; 2026 Buckksrob Pharmacy and Supermarket. All rights reserved.</span>
         </div>
       </div>
 
@@ -238,7 +236,7 @@ export default function AdminLoginPage() {
 
         <div className="z-10 bg-white/90 backdrop-blur-md rounded-3xl p-6 border border-blue-100 shadow-sm text-center">
           <h2 className="text-xl font-extrabold text-neutral-900 tracking-tight">
-            GloPharm Admin Dashboard
+            Buckksrob Admin Dashboard
           </h2>
           <p className="text-xs text-neutral-500 mt-1">
             Restricted access — staff with <code className="bg-blue-50 px-1 rounded text-[#1d68ff]">is_staff</code> permission only.

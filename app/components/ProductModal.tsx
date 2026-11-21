@@ -378,14 +378,14 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
                     {description}
                   </p>
                   <p>
-                    All pharmaceutical and grocery products distributed through GloPharm are sourced strictly from licensed manufacturers and accredited agricultural suppliers. Each batch undergoes rigorous temperature verification and quality assurance.
+                    All pharmaceutical and grocery products distributed through Buckksrob are sourced strictly from licensed manufacturers and accredited agricultural suppliers. Each batch undergoes rigorous temperature verification and quality assurance.
                   </p>
                   <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-4 mt-2">
                     <h4 className="font-bold text-gray-900 text-xs sm:text-sm mb-2 text-[#00A654] flex items-center gap-2">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
                       </svg>
-                      GloPharm Quality & Efficacy Guarantee
+                      Buckksrob Quality &amp; Efficacy Guarantee
                     </h4>
                     <ul className="list-disc list-inside text-xs sm:text-sm text-gray-600 space-y-1">
                       <li>100% Genuine and authentic product batch</li>
@@ -468,7 +468,7 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
                       name: "Chidi A.",
                       rating: 5,
                       date: "Nov 2026",
-                      text: "Excellent quality product, delivered within 3 hours. Authentic packaging with intact seals. Will definitely reorder from GloPharm!",
+                      text: "Excellent quality product, delivered within 3 hours. Authentic packaging with intact seals. Will definitely reorder from Buckksrob!",
                     },
                     {
                       name: "Ngozi O.",

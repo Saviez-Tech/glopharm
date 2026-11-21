@@ -1,145 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import Navbar from "./components/Navbar";
 import ProductCard, { Product } from "./components/ProductCard";
 import Footer from "./components/Footer";
 import LabResultSection from "./components/LabResultSection";
 import ProductModal from "./components/ProductModal";
-
-// Row 1 Products: Sliding from Right to Left (Marquee)
-const marqueeProducts: Product[] = [
-  {
-    id: "m1",
-    title: "Golden Morn Cereal (900g)",
-    description: "Nutritious whole grain cereal fortified with vitamin A, iron, and minerals.",
-    price: "3,500",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1521483451569-e33803c0330c?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-  {
-    id: "m2",
-    title: "Fresh Whole Milk (1L)",
-    description: "Pasteurized farm-fresh dairy milk rich in calcium, protein, and nutrients.",
-    price: "1,800",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 1, // Demonstrating active in-cart state
-  },
-  {
-    id: "m3",
-    title: "Vitamin C 1000mg Effervescent",
-    description: "High potency daily immune support drink tablets with orange flavor.",
-    price: "4,500",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-  {
-    id: "m4",
-    title: "Crisp Green Apples (6 Pack)",
-    description: "Hand-picked crunchy sweet apples freshly imported and packed for freshness.",
-    price: "2,900",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-  {
-    id: "m5",
-    title: "Malted Chocolate Drink (500g)",
-    description: "Enriched malted chocolate beverage packed with active energy vitamins.",
-    price: "3,200",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1541658016709-82535e94bc69?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-  {
-    id: "m6",
-    title: "Multivitamin Daily Formula",
-    description: "Comprehensive 30-in-1 vital supplement for all-day energy and wellness.",
-    price: "8,500",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1577401239170-897942555fb3?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-];
-
-// Next Two Rows: 8 Products (2 Rows x 4 Columns)
-const gridProducts: Product[] = [
-  {
-    id: "g1",
-    title: "Farm Fresh Organic Eggs (Crate)",
-    description: "Freshly collected high-protein free-range eggs from verified local poultry.",
-    price: "4,200",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-  {
-    id: "g2",
-    title: "Pain Relief Paracetamol Extra",
-    description: "Fast-acting effective relief from headaches, body aches, and fever symptoms.",
-    price: "1,500",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-  {
-    id: "g3",
-    title: "Golden Corn Flakes (500g)",
-    description: "Crispy roasted whole corn flakes packed with essential B vitamins.",
-    price: "2,600",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1521483451569-e33803c0330c?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-  {
-    id: "g4",
-    title: "Fresh Tomatoes & Bell Peppers",
-    description: "Farm-fresh ripe red tomatoes and bell peppers washed and ready for cooking.",
-    price: "3,000",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-  {
-    id: "g5",
-    title: "Cod Liver Oil Omega-3 (90 Caps)",
-    description: "Premium pure deep-sea fish oil for heart, joint, and brain health.",
-    price: "9,800",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1577401239170-897942555fb3?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-  {
-    id: "g6",
-    title: "Pure Wildflower Raw Honey (500g)",
-    description: "100% pure unfiltered raw organic honey bottled without preservatives.",
-    price: "5,400",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-  {
-    id: "g7",
-    title: "Whole Grain Rolled Oats (1kg)",
-    description: "100% natural wholegrain oats that help lower cholesterol and fuel your morning.",
-    price: "3,800",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1517673132405-a56a62b18caf?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-  {
-    id: "g8",
-    title: "Antiseptic Disinfectant Liquid",
-    description: "Hospital-grade antiseptic for personal hygiene and first aid wound care.",
-    price: "2,800",
-    currency: "₦",
-    image: "https://images.unsplash.com/photo-1584744982491-665216d95f8b?w=500&auto=format&fit=crop&q=80",
-    initialQuantity: 0,
-  },
-];
 
 export default function Home() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -185,17 +52,13 @@ export default function Home() {
   const marqueeItems =
     homeProducts.length >= 10
       ? homeProducts.slice(0, 10)
-      : homeProducts.length > 0
-      ? homeProducts
-      : marqueeProducts;
+      : homeProducts;
 
-  // Grid products: either remaining goods if >10 or all homeProducts / fallback
+  // Grid products: either remaining goods if >10 or all homeProducts
   const gridDisplayItems =
     homeProducts.length > 10
       ? homeProducts.slice(10)
-      : homeProducts.length > 0
-      ? homeProducts
-      : gridProducts;
+      : homeProducts;
 
 
   return (
@@ -246,22 +109,22 @@ export default function Home() {
 
             {/* CTA Buttons */}
             <div className="flex flex-wrap items-center gap-6 pt-2">
-              <a
-                href="#shop"
+              <Link
+                href="/products"
                 className="inline-flex items-center gap-2.5 px-8 py-3.5 bg-[#00A654] hover:bg-[#008f48] text-white font-semibold text-base rounded-full shadow-[0_4px_16px_rgba(0,166,84,0.3)] hover:shadow-[0_6px_22px_rgba(0,166,84,0.4)] transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
               >
                 <span>Shop Now</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
                 </svg>
-              </a>
+              </Link>
 
-              <a
-                href="#products"
+              <Link
+                href="/products"
                 className="text-neutral-900 hover:text-[#00A654] font-semibold text-base underline underline-offset-8 decoration-2 decoration-neutral-900 hover:decoration-[#00A654] transition-colors"
               >
                 View All Products
-              </a>
+              </Link>
             </div>
 
           </div>
@@ -435,43 +298,45 @@ export default function Home() {
         <div className="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
 
           {/* 3. ROW 1: ANIMATED CONTINUOUS SLIDER (STARTING & STOPPING AT PRODUCT GRID BOUNDS) */}
-          <section className="relative w-full py-2 z-10">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-3 w-3 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-[#00A654]" />
+          {marqueeItems.length > 0 && (
+            <section className="relative w-full py-2 z-10">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-3 w-3 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-[#00A654]" />
+                  </span>
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-900 tracking-tight">
+                    Hot Deals &amp; Daily Trending
+                  </h2>
+                </div>
+                <span className="text-xs font-medium text-gray-500 hidden sm:inline-block">
+                  Auto-scrolling • Hover to pause
                 </span>
-                <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-900 tracking-tight">
-                  Hot Deals &amp; Daily Trending
-                </h2>
               </div>
-              <span className="text-xs font-medium text-gray-500 hidden sm:inline-block">
-                Auto-scrolling • Hover to pause
-              </span>
-            </div>
 
-            {/* Marquee Window: Contained within the exact product bounds */}
-            <div className="relative w-full overflow-hidden rounded-2xl py-2">
-              {/* Left edge shadow fade */}
-              <div className="absolute left-0 inset-y-0 w-8 sm:w-16 bg-gradient-to-r from-[#edf4ee] to-transparent z-20 pointer-events-none" />
-              {/* Right edge shadow fade */}
-              <div className="absolute right-0 inset-y-0 w-8 sm:w-16 bg-gradient-to-l from-[#edf4ee] to-transparent z-20 pointer-events-none" />
+              {/* Marquee Window: Contained within the exact product bounds */}
+              <div className="relative w-full overflow-hidden rounded-2xl py-2">
+                {/* Left edge shadow fade */}
+                <div className="absolute left-0 inset-y-0 w-8 sm:w-16 bg-gradient-to-r from-[#edf4ee] to-transparent z-20 pointer-events-none" />
+                {/* Right edge shadow fade */}
+                <div className="absolute right-0 inset-y-0 w-8 sm:w-16 bg-gradient-to-l from-[#edf4ee] to-transparent z-20 pointer-events-none" />
 
-              {/* Seamless Infinite Loop moving from Right to Left: First 10 goods */}
-              <div className="animate-marquee-track flex gap-4 sm:gap-6 items-stretch">
-                {[...marqueeItems, ...marqueeItems].map((product, idx) => (
-                  <ProductCard
-                    key={`marquee-${product.id}-${idx}`}
-                    product={product}
-                    colorScheme="green"
-                    className="w-[230px] sm:w-[290px] shrink-0"
-                    onProductClick={setSelectedProduct}
-                  />
-                ))}
+                {/* Seamless Infinite Loop moving from Right to Left: First 10 goods */}
+                <div className="animate-marquee-track flex gap-4 sm:gap-6 items-stretch">
+                  {[...marqueeItems, ...marqueeItems].map((product, idx) => (
+                    <ProductCard
+                      key={`marquee-${product.id}-${idx}`}
+                      product={product}
+                      colorScheme="green"
+                      className="w-[230px] sm:w-[290px] shrink-0"
+                      onProductClick={setSelectedProduct}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           {/* 4. NEXT TWO ROWS: 8 NORMAL STATIC GRID PRODUCTS (2 PER ROW ON MOBILE) */}
           <section id="products" className="relative w-full pt-10 z-10">
@@ -506,10 +371,16 @@ export default function Home() {
               )}
               {homeError && (
                 <p className="col-span-full text-center text-xs text-amber-600 bg-amber-50 py-2 rounded-lg">
-                  {homeError} (Showing curated catalog below)
+                  {homeError}
                 </p>
               )}
-              {(!homeLoading ? gridDisplayItems : gridProducts).map((product) => (
+              {!homeLoading && gridDisplayItems.length === 0 && (
+                <div className="col-span-full py-12 text-center text-gray-500 bg-white rounded-2xl border border-gray-100 p-8">
+                  <p className="text-sm font-semibold text-gray-700">No products in inventory yet</p>
+                  <p className="text-xs text-gray-400 mt-1">Products added via admin will appear here.</p>
+                </div>
+              )}
+              {!homeLoading && gridDisplayItems.map((product) => (
                 <ProductCard
                   key={product.id}
                   product={product}

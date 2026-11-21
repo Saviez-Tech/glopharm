@@ -24,7 +24,7 @@ export default function LabResultSection() {
       ),
       step: "02",
       title: "Doctor Reviews Your Result",
-      desc: "A licensed GloPharm pharmacist or doctor analyses your report within hours.",
+      desc: "A licensed Buckksrob pharmacist or doctor analyses your report within hours.",
       color: "#00A654",
     },
     {

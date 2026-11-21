@@ -39,8 +39,8 @@ export default function ContactPage() {
     {
       title: "Customer Support",
       desc: "For inquiries on orders, delivery tracking, and returns.",
-      value: "+234 801 234 5678",
-      sub: "support@glopharm.ng",
+      value: "+234 816 972 8780",
+      sub: "support@buckksrob.ng",
       badge: "24/7 Available",
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -52,8 +52,8 @@ export default function ContactPage() {
     {
       title: "Pharmacy & Prescriptions",
       desc: "Connect directly with our clinical pharmacologists and doctors.",
-      value: "+234 802 555 0199",
-      sub: "prescriptions@glopharm.ng",
+      value: "+234 816 972 8780",
+      sub: "prescriptions@buckksrob.ng",
       badge: "Doctor On Duty",
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -65,8 +65,8 @@ export default function ContactPage() {
     {
       title: "Headquarters Hub",
       desc: "Our central logistics, certified pharmacy, and storage facility.",
-      value: "Victoria Island, Lagos",
-      sub: "12 Adeola Odeku Street, Lagos, Nigeria",
+      value: "Owerri, Imo State",
+      sub: "Estrella Plaza No 2 Nwaturuocha str, Ikenegbu by Pacs junction, Owerri, Imo State, Nigeria",
       badge: "Open Mon - Sun",
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -84,12 +84,12 @@ export default function ContactPage() {
       a: "Simply upload your test results (e.g. malaria panel, blood work, scan) on our platform. Our licensed physicians review the markers, generate a customized prescription, and your medications are packaged and dispatched directly to your door.",
     },
     {
-      q: "How fast is delivery across Lagos and other states?",
-      a: "In Lagos, grocery and prescription deliveries typically arrive within 2 to 4 hours. Nationwide deliveries to other Nigerian states arrive in 24 to 48 hours with full temperature-controlled packaging.",
+      q: "How fast is delivery across Owerri, Imo State, and other states?",
+      a: "In Owerri and across Imo State, grocery and prescription deliveries typically arrive within 2 to 4 hours. Nationwide deliveries to other Nigerian states arrive in 24 to 48 hours with full temperature-controlled packaging.",
     },
     {
       q: "Are all medications authentic and approved?",
-      a: "Yes, 100%. GloPharm sources exclusively from licensed pharmaceutical manufacturers and accredited distributors with full NAFDAC verification.",
+      a: "Yes, 100%. Buckksrob sources exclusively from licensed pharmaceutical manufacturers and accredited distributors with full NAFDAC verification.",
     },
     {
       q: "Can I speak directly with a pharmacist before ordering?",

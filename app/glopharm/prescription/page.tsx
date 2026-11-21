@@ -90,17 +90,6 @@ const DOCTORS = [
   { name: "Dr. menduzer", role: "Resident Physician" },
 ];
 
-const DEFAULT_DRUGS: CatalogProduct[] = [
-  { id: 1, name: "Paracetamol 500mg Tablets", price: 2000, image: "https://res.cloudinary.com/dpuvtcctg/image/upload/v1761670426/cld-sample-5.jpg", category: "Analgesic" },
-  { id: 2, name: "Artemether / Lumefantrine 80/480mg (ACT)", price: 4800, image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=200&auto=format&fit=crop&q=80", category: "Antimalarial" },
-  { id: 3, name: "Vitamin C 1000mg Effervescent (30 tabs)", price: 4500, image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=200&auto=format&fit=crop&q=80", category: "Supplements" },
-  { id: 4, name: "Amoxicillin / Clavulanic Acid 625mg (Augmentin)", price: 6500, image: "https://images.unsplash.com/photo-1550831107-1553da8c8464?w=200&auto=format&fit=crop&q=80", category: "Antibiotics" },
-  { id: 5, name: "Ciprofloxacin 500mg Tablets", price: 3500, image: "https://images.unsplash.com/photo-1584744982491-665216d95f8b?w=200&auto=format&fit=crop&q=80", category: "Antibiotics" },
-  { id: 6, name: "Ibuprofen 400mg Tablets", price: 1800, image: "https://images.unsplash.com/photo-1577401239170-897942555fb3?w=200&auto=format&fit=crop&q=80", category: "Pain Relief" },
-  { id: 7, name: "Multivitamin Daily Formula (30 caps)", price: 8500, image: "https://images.unsplash.com/photo-1577401239170-897942555fb3?w=200&auto=format&fit=crop&q=80", category: "Vitamins" },
-  { id: 8, name: "Metronidazole 400mg Tablets (Flagyl)", price: 2200, image: "https://images.unsplash.com/photo-1550831107-1553da8c8464?w=200&auto=format&fit=crop&q=80", category: "Antiprotozoal" },
-];
-
 const TABS = [
   { key: "all", label: "All Tests" },
   { key: "under_review", label: "Awaiting Review" },
@@ -364,8 +353,8 @@ function ReviewDrawer({
     fetchDetail();
   }, [fetchDetail]);
 
-  // Drug Catalog & Search
-  const [catalog, setCatalog] = useState<CatalogProduct[]>(DEFAULT_DRUGS);
+  // Drug Catalog & Search (loaded dynamically from store products)
+  const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [medQuery, setMedQuery] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [searchingMed, setSearchingMed] = useState(false);
@@ -393,7 +382,7 @@ function ReviewDrawer({
       try {
         const url = q
           ? `/api/ecommerce/products?q=${encodeURIComponent(q)}`
-          : "/api/ecommerce/products?page=1&page_size=50";
+          : "/api/ecommerce/products?page=1&page_size=100";
         const res = await fetch(url);
         if (res.ok) {
           const json = await res.json();
@@ -440,9 +429,6 @@ function ReviewDrawer({
       setCatalog((prev) => {
         const map = new Map<number, CatalogProduct>();
         found.forEach((item) => map.set(item.id, item));
-        DEFAULT_DRUGS.forEach((item) => {
-          if (!map.has(item.id)) map.set(item.id, item);
-        });
         prev.forEach((item) => {
           if (!map.has(item.id)) map.set(item.id, item);
         });
@@ -478,14 +464,17 @@ function ReviewDrawer({
 
   const filteredMedicines = useMemo(() => {
     const q = medQuery.trim().toLowerCase();
-    if (!q) return catalog.slice(0, 12);
-    return catalog
+    const unprescribed = catalog.filter(
+      (c) => !prescribedItems.some((d) => d.product_id === c.id)
+    );
+    if (!q) return unprescribed.slice(0, 20);
+    return unprescribed
       .filter(
         (c) =>
-          c.name.toLowerCase().includes(q) &&
-          !prescribedItems.some((d) => d.product_id === c.id)
+          c.name.toLowerCase().includes(q) ||
+          (c.category && c.category.toLowerCase().includes(q))
       )
-      .slice(0, 12);
+      .slice(0, 20);
   }, [catalog, medQuery, prescribedItems]);
 
   const addDrugFromCatalog = (c: CatalogProduct) => {
@@ -828,13 +817,13 @@ function ReviewDrawer({
                           className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 shadow-2xl"
                         >
                           <div className="flex items-center justify-between px-2.5 py-1 text-[11px] font-semibold text-gray-400 uppercase">
-                            <span>Available Drugs & Products</span>
+                            <span>Store Products Catalog</span>
                             {searchingMed && <span className="text-blue-600 lowercase font-normal">searching...</span>}
                           </div>
 
                           {filteredMedicines.length === 0 ? (
                             <div className="px-3 py-3 text-center text-xs text-gray-500">
-                              No matching drugs in catalog.
+                              No matching products in catalog.
                             </div>
                           ) : (
                             <div className="space-y-1">

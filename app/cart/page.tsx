@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -83,15 +83,40 @@ export default function CartPage() {
   const [confirmedOrder, setConfirmedOrder] = useState<PlacedOrderData | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<PaymentData | null>(null);
 
-  // Form states with realistic Nigerian defaults for quick testing
+  // Form states — empty by default, populated from authenticated user profile if logged in
   const [shippingForm, setShippingForm] = useState({
-    fullName: "Amaka Obi",
-    email: "amaka@example.com",
-    phone: "+2348012345678",
-    address: "12 Aka Road",
-    city: "Uyo",
-    state: "Akwa Ibom",
+    fullName: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "",
   });
+
+  // Auto-populate shipping details if user is logged in, else leave empty
+  useEffect(() => {
+    async function loadUserProfile() {
+      try {
+        const res = await fetch("/api/auth/profile");
+        if (!res.ok) return;
+        const json = await res.json();
+        const user = json.data;
+        if (user) {
+          setShippingForm((prev) => ({
+            fullName: prev.fullName || user.name || user.full_name || "",
+            email: prev.email || user.email || "",
+            phone: prev.phone || user.phone_number || user.phone || "",
+            address: prev.address || user.address || "",
+            city: prev.city || user.city || "",
+            state: prev.state || user.state || "",
+          }));
+        }
+      } catch {
+        // Guest user: leave empty
+      }
+    }
+    loadUserProfile();
+  }, []);
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [paymentMethod, setPaymentMethod] = useState<"paystack" | "transfer">("paystack");
@@ -208,14 +233,14 @@ export default function CartPage() {
       return;
     }
 
-    if (code === "GLOPHARM10" || code === "GLO10") {
+    if (code === "BUCKKSROB10" || code === "BRB10") {
       setAppliedDiscount(0.1);
       setPromoSuccess("10% discount applied successfully!");
     } else if (code === "GLO20") {
       setAppliedDiscount(0.2);
       setPromoSuccess("20% VIP discount applied successfully!");
     } else {
-      setPromoError("Invalid code. Try 'GLOPHARM10' for 10% off!");
+      setPromoError("Invalid code. Try 'BUCKKSROB10' for 10% off!");
     }
   };
 
@@ -687,12 +712,25 @@ export default function CartPage() {
                         Delivery Address
                       </h2>
                       <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
-                        Guest &amp; authenticated checkout: provide your delivery details below.
+                        Provide your delivery destination below.
                       </p>
                     </div>
-                    <span className="text-xs font-bold text-[#00A654] bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                      Express Nigeria Delivery
+                    <span className="text-xs font-bold text-[#0265CB] bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                      Standard &amp; Express Delivery
                     </span>
+                  </div>
+
+                  {/* Shipping Fee Notice */}
+                  <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-4 flex items-start gap-3 text-amber-950">
+                    <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                    </svg>
+                    <div className="text-xs leading-relaxed">
+                      <p className="font-bold text-amber-900">Notice regarding delivery costs:</p>
+                      <p className="mt-0.5 text-amber-800">
+                        Shipping is not free. Delivery fees are determined by the weight and dimensions of your packaged items and your delivery location. The exact shipping fee will be calculated and communicated to you after your goods are packaged.
+                      </p>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -703,7 +741,7 @@ export default function CartPage() {
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. Amaka Obi"
+                        placeholder="Enter recipient's full name"
                         value={shippingForm.fullName}
                         onChange={(e) => {
                           setShippingForm({ ...shippingForm, fullName: e.target.value });
@@ -727,7 +765,7 @@ export default function CartPage() {
                       </label>
                       <input
                         type="email"
-                        placeholder="e.g. amaka@example.com"
+                        placeholder="Enter email address"
                         value={shippingForm.email}
                         onChange={(e) => {
                           setShippingForm({ ...shippingForm, email: e.target.value });
@@ -751,7 +789,7 @@ export default function CartPage() {
                       </label>
                       <input
                         type="tel"
-                        placeholder="e.g. +2348012345678"
+                        placeholder="e.g. 08169728780 or +2348169728780"
                         value={shippingForm.phone}
                         onChange={(e) => {
                           setShippingForm({ ...shippingForm, phone: e.target.value });
@@ -775,7 +813,7 @@ export default function CartPage() {
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. 12 Aka Road"
+                        placeholder="Enter street delivery address"
                         value={shippingForm.address}
                         onChange={(e) => {
                           setShippingForm({ ...shippingForm, address: e.target.value });
@@ -799,7 +837,7 @@ export default function CartPage() {
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. Uyo"
+                        placeholder="Enter delivery city"
                         value={shippingForm.city}
                         onChange={(e) => {
                           setShippingForm({ ...shippingForm, city: e.target.value });
@@ -891,82 +929,36 @@ export default function CartPage() {
                     </button>
                   </div>
 
-                  {/* Payment Method Selector */}
+                  {/* Payment Method */}
                   <div>
                     <h2 className="text-xl sm:text-2xl font-serif font-bold text-neutral-900 mb-4">
-                      Select Payment Method
+                      Payment Method
                     </h2>
 
-                    <div className="space-y-3">
-                      {/* Paystack Gateway (Cards, Transfer, Apple/Google Pay, USSD) */}
-                      <label
-                        onClick={() => setPaymentMethod("paystack")}
-                        className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                          paymentMethod === "paystack"
-                            ? "border-[#00A654] bg-emerald-50/40 shadow-xs"
-                            : "border-neutral-200 hover:border-neutral-300"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            name="payment"
-                            checked={paymentMethod === "paystack"}
-                            onChange={() => setPaymentMethod("paystack")}
-                            className="w-4 h-4 text-[#00A654] focus:ring-[#00A654]"
-                          />
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-bold text-neutral-900">Paystack Secure Checkout</p>
-                              <span className="text-[10px] font-bold uppercase tracking-wider bg-[#00A654] text-white px-2 py-0.2 rounded-full">
-                                Recommended
-                              </span>
-                            </div>
-                            <p className="text-xs text-neutral-500 mt-0.5">
-                              Instant payment via Debit Card (Visa, Mastercard, Verve), Bank Transfer, or USSD
-                            </p>
+                    <div className="p-4 rounded-2xl border-2 border-[#00A654] bg-emerald-50/40 shadow-xs flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-5 h-5 rounded-full bg-[#00A654] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                          ✓
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-neutral-900">Paystack Secure Checkout</p>
+                            <span className="text-[10px] font-bold uppercase tracking-wider bg-[#00A654] text-white px-2 py-0.5 rounded-full">
+                              Instant
+                            </span>
                           </div>
+                          <p className="text-xs text-neutral-600 mt-0.5">
+                            Pay securely with your Debit Card (Visa, Mastercard, Verve), Bank Transfer, or USSD
+                          </p>
                         </div>
+                      </div>
 
-                        <div className="flex items-center gap-1.5 text-neutral-700">
-                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
-                            <rect width="20" height="14" x="2" y="5" rx="2" />
-                            <line x1="2" x2="22" y1="10" y2="10" />
-                          </svg>
-                        </div>
-                      </label>
-
-                      {/* Manual Transfer */}
-                      <label
-                        onClick={() => setPaymentMethod("transfer")}
-                        className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                          paymentMethod === "transfer"
-                            ? "border-[#00A654] bg-emerald-50/40 shadow-xs"
-                            : "border-neutral-200 hover:border-neutral-300"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            name="payment"
-                            checked={paymentMethod === "transfer"}
-                            onChange={() => setPaymentMethod("transfer")}
-                            className="w-4 h-4 text-[#00A654] focus:ring-[#00A654]"
-                          />
-                          <div>
-                            <p className="text-sm font-bold text-neutral-900">Direct Bank Transfer</p>
-                            <p className="text-xs text-neutral-500 mt-0.5">
-                              Transfer to GloPharm corporate bank account with instant receipt confirmation
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="text-neutral-700">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.5m-15 10.5V10.5M3 21h18M1.5 10.5h21" />
-                          </svg>
-                        </div>
-                      </label>
+                      <div className="flex items-center gap-1.5 text-neutral-700 shrink-0">
+                        <svg className="w-6 h-6 text-[#00A654]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
+                          <rect width="20" height="14" x="2" y="5" rx="2" />
+                          <line x1="2" x2="22" y1="10" y2="10" />
+                        </svg>
+                      </div>
                     </div>
                   </div>
 
@@ -1048,9 +1040,16 @@ export default function CartPage() {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between text-neutral-600">
-                    <span>Shipping</span>
-                    <span className="font-bold text-[#00A654]">Free</span>
+                  <div className="flex flex-col gap-1 py-1 text-xs sm:text-sm">
+                    <div className="flex items-center justify-between text-neutral-700">
+                      <span className="font-medium">Shipping</span>
+                      <span className="font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px]">
+                        Calculated after packaging
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-500 leading-snug">
+                      Shipping fee is calculated and communicated to you after packaging your goods.
+                    </p>
                   </div>
 
                   <div className="flex items-center justify-between text-neutral-600">
@@ -1064,7 +1063,7 @@ export default function CartPage() {
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
-                      placeholder="Promo code (try GLO10)"
+                      placeholder="Promo code (try BRB10)"
                       value={promoCode}
                       onChange={(e) => {
                         setPromoCode(e.target.value);
@@ -1137,7 +1136,7 @@ export default function CartPage() {
                     <svg className="w-4 h-4 text-neutral-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-1.5-4.875L18.75 4.5H15m4.5 9.75H15M3.375 14.25H15M3.375 14.25h1.125m10.5 0v-4.5m0 0V4.5M15 9.75h3.75" />
                     </svg>
-                    <span>Free temperature-controlled delivery</span>
+                    <span>Careful, temperature-monitored packaging</span>
                   </div>
 
                   <div className="flex items-center gap-2.5 text-xs text-neutral-600">

@@ -82,10 +82,10 @@ export default function Footer() {
 
               {/* Subtext */}
               <p className="text-white/80 text-xs mt-3 leading-relaxed">
-                You will be able to unsubscribe at any time. Read our privacy policy{" "}
-                <a href="#privacy" className="underline underline-offset-2 hover:text-white transition-colors">
+                You will be able to unsubscribe at any time. Read our terms &amp; conditions{" "}
+                <Link href="/terms" className="underline underline-offset-2 hover:text-white transition-colors">
                   here
-                </a>
+                </Link>
                 .
               </p>
             </div>
@@ -103,18 +103,11 @@ export default function Footer() {
             {/* Column 1: Brand Info (Logo, description, socials) */}
             <div className="lg:col-span-4 flex flex-col items-start gap-4">
               <a href="/" className="flex items-center gap-2.5 group">
-                <div className="w-10 h-10 rounded-xl bg-[#00A654] flex items-center justify-center text-white shadow-md">
-                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 10h16l-1.5 10h-13z" />
-                    <path d="M9 10V6a3 3 0 0 1 6 0v4" />
-                    <circle cx="10" cy="14" r="1" fill="currentColor" />
-                    <circle cx="14" cy="14" r="1" fill="currentColor" />
-                    <line x1="8" y1="17" x2="16" y2="17" />
-                  </svg>
+                <div className="w-10 h-10 rounded-xl overflow-hidden border border-gray-100 shadow-md">
+                  <img src="/images/logo.jpg" alt="Buckksrob" className="w-full h-full object-cover" />
                 </div>
                 <span className="text-2xl font-black tracking-tight text-neutral-900 flex items-center">
-                  Glo<span className="text-[#00A654]">Pharm</span>
-                  <span className="text-[#0265CB] font-black">.</span>
+                  Buckksrob
                 </span>
               </a>
 
@@ -180,18 +173,18 @@ export default function Footer() {
             <div className="lg:col-span-2 flex flex-col gap-3">
               <h4 className="font-bold text-gray-900 text-sm tracking-tight mb-1">Support</h4>
               <Link href="/contact" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Help &amp; Inquiries</Link>
-              <a href="https://wa.me/2348012345678" target="_blank" rel="noreferrer" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">WhatsApp Chat</a>
+              <a href="https://wa.me/2348169728780" target="_blank" rel="noreferrer" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">WhatsApp Chat</a>
               <Link href="/account/prescriptions" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Upload Prescription</Link>
               <Link href="/account" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">My Account</Link>
             </div>
 
-            {/* Column 4: Links */}
+            {/* Column 4: Company Policy */}
             <div className="lg:col-span-2 flex flex-col gap-3">
-              <h4 className="font-bold text-gray-900 text-sm tracking-tight mb-1">Links</h4>
-              <Link href="/products?category=Fresh%20Fruits" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Fresh Groceries</Link>
-              <Link href="/pharmacy" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Pharmacy &amp; Meds</Link>
-              <Link href="/account/orders" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Order Tracking</Link>
-              <Link href="/products" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">All in One Store</Link>
+              <h4 className="font-bold text-gray-900 text-sm tracking-tight mb-1">Company Policy</h4>
+              <Link href="/terms" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Terms &amp; Conditions</Link>
+              <Link href="/refund-policy" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Refund Policy</Link>
+              <Link href="/shipping-policy" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Delivery &amp; Shipping</Link>
+              <Link href="/contact" className="text-gray-500 hover:text-[#00A654] text-xs sm:text-sm transition-colors">Customer Support</Link>
             </div>
 
             {/* Column 5: Contact Us */}
@@ -204,8 +197,8 @@ export default function Footer() {
                 <svg className="w-4 h-4 text-[#00A654] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
                 </svg>
-                <a href="tel:+234123456789" className="hover:text-[#00A654] font-medium transition-colors">
-                  (234) 123 456 789
+                <a href="tel:+2348169728780" className="hover:text-[#00A654] font-medium transition-colors">
+                  +234 816 972 8780
                 </a>
               </div>
 
@@ -213,8 +206,8 @@ export default function Footer() {
                 <svg className="w-4 h-4 text-[#00A654] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
                 </svg>
-                <a href="mailto:support@glopharm.ng" className="hover:text-[#00A654] font-medium transition-colors">
-                  support@glopharm.ng
+                <a href="mailto:support@buckksrob.ng" className="hover:text-[#00A654] font-medium transition-colors">
+                  support@buckksrob.ng
                 </a>
               </div>
 
@@ -223,7 +216,7 @@ export default function Footer() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
                 </svg>
-                <span>Lagos, Nigeria</span>
+                <span>Estrella Plaza No 2 Nwaturuocha str, Ikenegbu by Pacs junction, Owerri, Imo State, Nigeria</span>
               </div>
             </div>
 
@@ -231,13 +224,12 @@ export default function Footer() {
 
           {/* 3. Bottom Legal & Copyright Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-8 text-xs text-gray-500">
-            <p>© Copyright by GloPharm. All rights reserved.</p>
-            <div className="flex items-center gap-6">
-              <a href="#privacy" className="hover:text-[#00A654] transition-colors">Privacy Policy</a>
-              <a href="#terms" className="hover:text-[#00A654] transition-colors">Terms of Use</a>
-              <a href="#legal" className="hover:text-[#00A654] transition-colors">Legal</a>
-              <a href="#sitemap" className="hover:text-[#00A654] transition-colors">Site Map</a>
-              <Link href="/glopharmadmin" className="hover:text-[#00A654] font-semibold text-gray-700 transition-colors">Admin Portal</Link>
+            <p>© Copyright by Buckksrob Pharmacy and Supermarket. All rights reserved.</p>
+            <div className="flex items-center flex-wrap gap-4 sm:gap-6">
+              <Link href="/terms" className="hover:text-[#00A654] transition-colors">Terms and Conditions</Link>
+              <Link href="/refund-policy" className="hover:text-[#00A654] transition-colors">Refund Policy</Link>
+              <Link href="/shipping-policy" className="hover:text-[#00A654] transition-colors">Shipping Policy</Link>
+              <Link href="/contact" className="hover:text-[#00A654] transition-colors">Help &amp; Support</Link>
             </div>
           </div>
 
